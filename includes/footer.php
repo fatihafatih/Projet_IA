@@ -1,0 +1,1 @@
+<footer>ici c le footer</footer>
