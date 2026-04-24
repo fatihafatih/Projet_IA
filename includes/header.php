@@ -3,7 +3,7 @@
 <header class="navbar-main">
 
     <a class="logo-link" href="../php/dashboard.php">
-    <img src="../images/logo1.png" alt="SearchIA" style="width:50px; height:50px; object-fit:contain;">
+    <img src="../public/logo1.png" alt="SearchIA" style="width:50px; height:50px; object-fit:contain;">
         <span class="logo-name">Search<span>IA</span></span>
     </a>
 
