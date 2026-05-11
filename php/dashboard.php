@@ -139,7 +139,7 @@ $total = count($outils);
               </span>
 
               <?php if ($o['url']): ?>
-                <a class="btn-see" href="<?= htmlspecialchars($o['url']) ?>" target="_blank" rel="noopener">
+                <a class="btn-see" href="outil.php?id=<?= $o['ID_OUTILS_IA'] ?>" target="_blank" rel="noopener">
                   Voir →
                 </a>
               <?php else: ?>
