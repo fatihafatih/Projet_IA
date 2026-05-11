@@ -86,8 +86,7 @@ $total = count($outils);
       <select class="sort-select" onchange="doSort(this.value)">
         <option value="default">Par défaut</option>
         <option value="rating_desc">Mieux notés</option>
-        <option value="rating_asc">Moins bien notés</option>
-        <option value="perf_desc">Performance</option>
+        <option value="rating_asc">Moins notés</option>
       </select>
     </div>
 

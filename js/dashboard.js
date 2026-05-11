@@ -43,20 +43,20 @@ function apply() {
         const mc = !activeCat || el.dataset.cat.includes(activeCat);
         //si active est remplie=> !true || 
         //retourne si la categorie de lelement de la grid contient la cat du activeCat
-        const ms = !search || [el.dataset.nom, el.dataset.cat, el.dataset.lang, el.dataset.desc]
-            //un tableau contenant les infos du modele                  
-            .some(s => s && s.includes(search));// lattribut est existant et contient le mot cle
+        const ms = !search || [el.dataset.nom, el.dataset.cat, el.dataset.desc]
+            //un tableau contenant les infos de l'outil             
+            .some(s => s && s.includes(search)); // l'attribut est existant et contient le mot cle
 
         //retourne si le mot cle entree dans la barre de recherche se trouve
-        //dans le nom/categorie/langage ou description de lelement(modele)
+        //dans le nom/categorie ou description de l'outil
         return mc && ms;
     });
 
-    if (sortVal === 'price_asc') filtered.sort((a, b) => +a.dataset.prix - +b.dataset.prix);
-    //a et b sont deux element de filtered/ le plus sert a convertir le prix en float
+    // Tris
+    if (sortVal === 'rating_desc') filtered.sort((a, b) => +b.dataset.rating - +a.dataset.rating);
+    //a et b sont deux elements de filtered / le + sert a convertir le rating en float
     //sort() utilise : résultat négatif → a avant b / positif → b avant a / 0 → égaux
-    if (sortVal === 'price_desc') filtered.sort((a, b) => +b.dataset.prix - +a.dataset.prix);
-    if (sortVal === 'speed') filtered.sort((a, b) => +b.dataset.speed - +a.dataset.speed);
+    if (sortVal === 'rating_asc')  filtered.sort((a, b) => +a.dataset.rating - +b.dataset.rating);
 
     // Masquer tous les éléments
     all.forEach(el => el.classList.add('d-none'));
@@ -68,13 +68,13 @@ function apply() {
     });
 
     const n = filtered.length;
-    document.getElementById('countBadge').textContent = n + ' modèles';
+    document.getElementById('countBadge').textContent = n + ' outil' + (n > 1 ? 's' : '');
     document.getElementById('noResults').style.display = n ? 'none' : 'block';
 
     const wrap = document.getElementById('showMoreWrap');
     if (wrap) {
         wrap._filtered = filtered;
-        //stocke dans lelement html la liste des element a afficher
+        //stocke dans lelement html la liste des elements a afficher
         wrap._shown = STEP;
         const rem = n - STEP;
         if (rem > 0) {
