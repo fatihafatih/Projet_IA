@@ -1218,10 +1218,28 @@ footer {
   .ot-score-num { font-size: 1.2rem; }
   .ot-col-side { position: static; }
 }
+/* ── modele.php additions (à ajouter après les styles outil.php) ─────────── */
 
-/* ── Lien "Voir" dans dashboard vers outil.php ────────────────────────────── */
-/* Modif à apporter dans dashboard.php :
-   href="outil.php?id=<?= $o['ID_OUTILS_IA'] ?>"
-   (remplace href="<?= htmlspecialchars($o['url']) ?>")
-*/
+/* Hero légèrement teinté pour différencier de outil.php */
+.md-hero { background: linear-gradient(160deg, #f8faff 0%, var(--white) 60%); }
+
+/* Logo un peu plus grand pour le provider */
+.md-logo { width: 72px; height: 72px; border-radius: 16px; }
+
+/* Pill provider */
+.md-provider-pill {
+  font-size: .72rem;
+  font-weight: 700;
+  color: #7c3aed;
+  background: #f5f3ff;
+  border-radius: 99px;
+  padding: 3px 11px;
+}
+
+/* Tags dans le hero */
+.md-tags { margin-top: 10px; }
+
+/* Status en_cours */
+.ot-status-en_cours { background: #fffbeb; color: #d97706; }
+.ot-model-status--en_cours { background: #fffbeb; color: #d97706; }
   

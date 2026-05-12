@@ -1,12 +1,15 @@
 <?php
 $host     = 'localhost';
 $dbname   = 'prj_ai';
+// $dbname   = 'projet_ia';
+// $port=3307;
 $username = 'root';
 $password = '';
 
 try {
     $pdo = new PDO(
         "mysql:host=$host;dbname=$dbname;charset=utf8",
+        //         "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8",
         $username,
         $password,
         [

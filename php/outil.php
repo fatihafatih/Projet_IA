@@ -275,9 +275,6 @@ $avg_review = count($reviews)
               </div>
               <?php endif; ?>
               <div class="c-foot">
-                <span class="ot-model-status ot-model-status--<?= $mod['status'] ?>">
-                  <?= $mod['status'] ?>
-                </span>
                 <a class="btn-see" href="modele.php?id=<?= $mod['ID_MODEL'] ?>">Voir →</a>
               </div>
             </div>
