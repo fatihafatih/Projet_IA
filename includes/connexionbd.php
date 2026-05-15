@@ -1,6 +1,7 @@
 <?php
 $host     = 'localhost';
-$dbname   = 'prj_ai';
+// $dbname   = 'prj_ai';
+$dbname   = 'projet_ia';
  $port=3307;
 $username = 'root';
 $password = '';

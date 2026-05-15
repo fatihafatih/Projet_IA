@@ -1,13 +1,15 @@
 <?php
 session_start();
 
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ./dashboard.php');
+    exit;
+}
+
 require_once '../includes/connexionbd.php';
 include "../includes/header.php";
 
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ../index.php');
-    exit;
-}
+
 
 // Récupérer les infos utilisateur
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
