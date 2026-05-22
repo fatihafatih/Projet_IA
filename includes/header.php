@@ -3,11 +3,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 ?>
-<?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-?>
 
 <link rel="stylesheet" href="../styles/style.css">
 
@@ -21,11 +16,9 @@ if (session_status() === PHP_SESSION_NONE) {
     <nav class="nav-center">
         <a href="../php/dashboard.php">AI Tools</a>
         <a href="add-tool.php">Add Tool</a>
-        <a href="news.php">News</a>
     </nav>
 
     <div class="navbar-right">
-
              <?php include "../php/auth.php"; ?>
 
     </div>
