@@ -34,7 +34,28 @@ $total = count($outils);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Référentiel d'outils IA</title>
   <link rel="stylesheet" href="../styles/style.css">
+  <link rel="stylesheet" href="../styles/favoris.css">
+
 </head>
+<!-- ══ MODAL COLLECTIONS ══════════════════════════════════════════════════ -->
+<div class="fav-overlay" id="favOverlay" style="display:none">
+  <div class="fav-modal" id="favModal">
+    <div class="fav-modal-head">
+      <span>💾 Sauvegarder dans…</span>
+      <button class="fav-close" id="favClose">✕</button>
+    </div>
+
+    <div class="fav-collections" id="favCollections">
+      <!-- rempli par JS -->
+    </div>
+
+    <div class="fav-new" id="favNewWrap">
+      <input type="text" id="favNewInput" placeholder="Nom de la nouvelle collection…" maxlength="100">
+      <button id="favNewBtn">Créer</button>
+    </div>
+    <p class="fav-new-error" id="favNewError"></p>
+  </div>
+</div>
 
 <body>
 
@@ -131,20 +152,27 @@ $total = count($outils);
               <?= htmlspecialchars($o['description'] ?: 'Aucune description disponible.') ?>
             </p>
 
-            <!-- Footer carte : note + lien -->
+            <!-- Footer carte : note + lien + ajouter favoris-->
             <div class="c-foot">
-              <!-- Note globale avec étoile -->
-              <span class="c-rating">
-                ★ <?= $rating ?>
-              </span>
+              <span class="c-rating">★ <?= $rating ?></span>
 
-              <?php if ($o['url']): ?>
-                <a class="btn-see" href="outil.php?id=<?= $o['ID_OUTILS_IA'] ?>" rel="noopener">
-                  Voir →
-                </a>
-              <?php else: ?>
-                <span class="btn-see btn-off">Indisponible</span>
-              <?php endif; ?>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <!-- ❤ Bouton favori -->
+                <?php if (isset($_SESSION['user_id'])): ?>
+                  <button class="btn-fav js-fav-btn" data-id="<?= $o['ID_OUTILS_IA'] ?>" title="Ajouter aux favoris">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path
+                        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                <?php endif; ?>
+
+                <?php if ($o['url']): ?>
+                  <a class="btn-see" href="outil.php?id=<?= $o['ID_OUTILS_IA'] ?>">Voir →</a>
+                <?php else: ?>
+                  <span class="btn-see btn-off">Indisponible</span>
+                <?php endif; ?>
+              </div>
             </div>
           </div>
         </div>

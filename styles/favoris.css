@@ -1,0 +1,163 @@
+/* ── Bouton favori (cœur) ────────────────────────────────────────────────── */
+.btn-fav {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: background .15s;
+    flex-shrink: 0;
+}
+
+.btn-fav:hover {
+    background: #fee2e2;
+}
+
+.btn-fav svg {
+    width: 16px;
+    height: 16px;
+    stroke: var(--muted);
+    fill: none;
+    transition: stroke .15s, fill .15s;
+}
+
+.btn-fav.is-fav svg {
+    stroke: #ef4444;
+    fill: #ef4444;
+}
+
+/* ── Modal collections ───────────────────────────────────────────────────── */
+.fav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fav-modal {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 24px;
+    width: 340px;
+    max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .18);
+}
+
+.fav-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 18px;
+}
+
+.fav-close {
+    border: none;
+    background: var(--bg);
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: .85rem;
+    color: var(--muted);
+    transition: background .15s;
+}
+
+.fav-close:hover {
+    background: var(--border);
+}
+
+.fav-collections {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.fav-col-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    font-size: .88rem;
+    color: var(--ink2);
+}
+
+.fav-col-item:hover {
+    border-color: var(--blue-m);
+    background: var(--blue-l);
+}
+
+.fav-col-item.is-fav {
+    border-color: #ef4444;
+    background: #fff5f5;
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.fav-col-check {
+    font-size: 1rem;
+}
+
+.fav-new {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.fav-new input {
+    flex: 1;
+    height: 36px;
+    padding: 0 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: .85rem;
+    outline: none;
+    transition: border-color .2s;
+}
+
+.fav-new input:focus {
+    border-color: var(--blue);
+}
+
+.fav-new button {
+    height: 36px;
+    padding: 0 14px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: .83rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    white-space: nowrap;
+}
+
+.fav-new button:hover {
+    background: #1d4ed8;
+}
+
+.fav-new-error {
+    font-size: .78rem;
+    color: #ef4444;
+    margin-top: 6px;
+    min-height: 18px;
+}

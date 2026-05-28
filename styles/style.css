@@ -680,11 +680,21 @@ body {
     border: 2px solid var(--nb-bg);
 }
 
-.icon-sun { display: block; }
-.icon-moon { display: none; }
+.icon-sun {
+    display: block;
+}
 
-[data-theme="dark"] .icon-sun { display: none; }
-[data-theme="dark"] .icon-moon { display: block; }
+.icon-moon {
+    display: none;
+}
+
+[data-theme="dark"] .icon-sun {
+    display: none;
+}
+
+[data-theme="dark"] .icon-moon {
+    display: block;
+}
 
 /* ── FOOTER ──────────────────────────────────────────────────────────────── */
 footer {
@@ -762,10 +772,25 @@ footer {
     white-space: nowrap;
 }
 
-.av1 { background: #1a1052; color: #9d97f5; }
-.av2 { background: #051838; color: #5fa0e8; }
-.av3 { background: #041a12; color: #3dc49a; }
-.av4 { background: #1a0a1a; color: #c97ad4; }
+.av1 {
+    background: #1a1052;
+    color: #9d97f5;
+}
+
+.av2 {
+    background: #051838;
+    color: #5fa0e8;
+}
+
+.av3 {
+    background: #041a12;
+    color: #3dc49a;
+}
+
+.av4 {
+    background: #1a0a1a;
+    color: #c97ad4;
+}
 
 .tf-footer-bottom {
     display: flex;

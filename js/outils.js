@@ -1,5 +1,4 @@
 // outil.js
-console.log('outil.js chargé');
 document.addEventListener('DOMContentLoaded', () => {
 
   // ── Anime les barres de performance ────────────────────────────────────
@@ -88,84 +87,185 @@ document.addEventListener('DOMContentLoaded', () => {
   // À la fin du DOMContentLoaded, avant la fermeture });
 
   // ── Boutons modifier / annuler ──────────────────────────────────────────
-// ── Boutons modifier / annuler ──────────────────────────
-document.querySelectorAll('.js-edit-btn, .js-cancel-btn').forEach(btn => {
+  // ── Boutons modifier / annuler ──────────────────────────
+  document.querySelectorAll('.js-edit-btn, .js-cancel-btn').forEach(btn => {
 
-  btn.addEventListener('click', () => {
+    btn.addEventListener('click', () => {
 
-    const reviewId = btn.dataset.id;
-    const form = document.getElementById('edit-form-' + reviewId);
+      const reviewId = btn.dataset.id;
+      const form = document.getElementById('edit-form-' + reviewId);
 
-    if (!form) return;
+      if (!form) return;
 
-    // Vérifie le vrai display calculé
-    const isHidden = window.getComputedStyle(form).display === 'none';
+      // Vérifie le vrai display calculé
+      const isHidden = window.getComputedStyle(form).display === 'none';
 
-    form.style.display = isHidden ? 'block' : 'none';
+      form.style.display = isHidden ? 'block' : 'none';
 
-    // Si on ouvre le formulaire
-    if (isHidden) {
+      // Si on ouvre le formulaire
+      if (isHidden) {
 
-      const editStars = form.querySelectorAll('.ot-sp-star');
+        const editStars = form.querySelectorAll('.ot-sp-star');
 
-      editStars.forEach((star, index) => {
+        editStars.forEach((star, index) => {
 
-        const radio = star.querySelector('input');
+          const radio = star.querySelector('input');
 
-        // état initial
-        if (radio.checked) {
-          for (let i = 0; i <= index; i++) {
-            editStars[i].querySelector('svg').style.fill = '#f59e0b';
-            editStars[i].querySelector('svg').style.stroke = '#f59e0b';
+          // état initial
+          if (radio.checked) {
+            for (let i = 0; i <= index; i++) {
+              editStars[i].querySelector('svg').style.fill = '#f59e0b';
+              editStars[i].querySelector('svg').style.stroke = '#f59e0b';
+            }
           }
-        }
 
-        // click
-        star.addEventListener('click', () => {
+          // click
+          star.addEventListener('click', () => {
 
-          radio.checked = true;
+            radio.checked = true;
 
-          editStars.forEach((s, j) => {
+            editStars.forEach((s, j) => {
 
-            const svg = s.querySelector('svg');
+              const svg = s.querySelector('svg');
 
-            svg.style.fill = j <= index ? '#f59e0b' : '#d1d5db';
-            svg.style.stroke = j <= index ? '#f59e0b' : '#d1d5db';
+              svg.style.fill = j <= index ? '#f59e0b' : '#d1d5db';
+              svg.style.stroke = j <= index ? '#f59e0b' : '#d1d5db';
+            });
           });
-        });
 
-        // hover
-        star.addEventListener('mouseenter', () => {
+          // hover
+          star.addEventListener('mouseenter', () => {
 
-          editStars.forEach((s, j) => {
+            editStars.forEach((s, j) => {
 
-            const svg = s.querySelector('svg');
+              const svg = s.querySelector('svg');
 
-            svg.style.fill = j <= index ? '#f59e0b' : '#d1d5db';
-            svg.style.stroke = j <= index ? '#f59e0b' : '#d1d5db';
+              svg.style.fill = j <= index ? '#f59e0b' : '#d1d5db';
+              svg.style.stroke = j <= index ? '#f59e0b' : '#d1d5db';
+            });
           });
-        });
 
-        // leave
-        star.addEventListener('mouseleave', () => {
+          // leave
+          star.addEventListener('mouseleave', () => {
 
-          const checked = form.querySelector('input[type="radio"]:checked');
-          const checkedVal = checked ? parseInt(checked.value) : 0;
+            const checked = form.querySelector('input[type="radio"]:checked');
+            const checkedVal = checked ? parseInt(checked.value) : 0;
 
-          editStars.forEach((s, j) => {
+            editStars.forEach((s, j) => {
 
-            const svg = s.querySelector('svg');
+              const svg = s.querySelector('svg');
 
-            svg.style.fill = j < checkedVal ? '#f59e0b' : '#d1d5db';
-            svg.style.stroke = j < checkedVal ? '#f59e0b' : '#d1d5db';
+              svg.style.fill = j < checkedVal ? '#f59e0b' : '#d1d5db';
+              svg.style.stroke = j < checkedVal ? '#f59e0b' : '#d1d5db';
+            });
           });
-        });
 
-      });
-    }
+        });
+      }
+
+    });
 
   });
+  // ── Gestion des favoris (même logique que dashboard) ───────────────────
+  let currentOutilId = null;
 
-});
+  document.querySelectorAll('.js-fav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      currentOutilId = btn.dataset.id;
+
+      const res = await fetch(`../includes/favoris.php?action=get_collections&id_outil=${currentOutilId}`);
+      const data = await res.json();
+
+      if (data.error === 'non_connecte') {
+        window.location.href = 'login.php';
+        return;
+      }
+
+      // Remplit la liste des collections
+      const container = document.getElementById('favCollections');
+      container.innerHTML = '';
+      data.collections.forEach(col => {
+        const div = document.createElement('div');
+        div.className = 'fav-col-item' + (col.is_fav == 1 ? ' is-fav' : '');
+        div.dataset.colId = col.ID_COLLECTIONS;
+        div.innerHTML = `
+                <span>${col.name}</span>
+                <span class="fav-col-check">${col.is_fav == 1 ? '❤️' : '🤍'}</span>
+            `;
+        div.addEventListener('click', () => toggleFavOutil(col.ID_COLLECTIONS, div, btn));
+        container.appendChild(div);
+      });
+
+      // État initial du bouton
+      const anyFav = data.collections.some(c => c.is_fav == 1);
+      btn.classList.toggle('is-fav', anyFav);
+
+      document.getElementById('favNewInput').value = '';
+      document.getElementById('favNewError').textContent = '';
+      document.getElementById('favOverlay').style.display = 'flex';
+    });
+  });
+
+  async function toggleFavOutil(colId, divEl, btn) {
+    const formData = new FormData();
+    formData.append('action', 'toggle_favori');
+    formData.append('id_outil', currentOutilId);
+    formData.append('id_collection', colId);
+
+    const res = await fetch('../includes/favoris.php', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.success) {
+      const isFav = data.state === 'added';
+      divEl.classList.toggle('is-fav', isFav);
+      divEl.querySelector('.fav-col-check').textContent = isFav ? '❤️' : '🤍';
+
+      // Met à jour le bouton hero
+      const anyFav = [...document.querySelectorAll('#favCollections .fav-col-item')]
+        .some(d => d.classList.contains('is-fav'));
+      btn.classList.toggle('is-fav', anyFav);
+    }
+  }
+
+  document.getElementById('favNewBtn')?.addEventListener('click', async () => {
+    const input = document.getElementById('favNewInput');
+    const error = document.getElementById('favNewError');
+    const name = input.value.trim();
+
+    if (!name) { error.textContent = 'Entrez un nom de collection.'; return; }
+
+    const formData = new FormData();
+    formData.append('action', 'create_collection');
+    formData.append('name', name);
+
+    const res = await fetch('../includes/favoris.php', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.error === 'existe_deja') { error.textContent = 'Cette collection existe déjà.'; return; }
+
+    if (data.success) {
+      error.textContent = '';
+      input.value = '';
+      const container = document.getElementById('favCollections');
+      const div = document.createElement('div');
+      div.className = 'fav-col-item';
+      div.dataset.colId = data.id;
+      div.innerHTML = `<span>${data.name}</span><span class="fav-col-check">🤍</span>`;
+      // Récupère le bouton actif pour le passer au toggle
+      const btn = document.querySelector('.js-fav-btn');
+      div.addEventListener('click', () => toggleFavOutil(data.id, div, btn));
+      container.appendChild(div);
+    }
+  });
+
+  document.getElementById('favClose')?.addEventListener('click', () => {
+    document.getElementById('favOverlay').style.display = 'none';
+  });
+
+  document.getElementById('favOverlay')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('favOverlay')) {
+      document.getElementById('favOverlay').style.display = 'none';
+    }
+  });
 
 }); // ← fin DOMContentLoaded

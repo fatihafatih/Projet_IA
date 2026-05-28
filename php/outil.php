@@ -186,11 +186,30 @@ $avg_review = count($reviews)
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($outil['nom']) ?> — Référentiel IA</title>
   <link rel="stylesheet" href="../styles/outil.css">
+  <link rel="stylesheet" href="../styles/favoris.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
+
+<!-- ══ MODAL COLLECTIONS ══════════════════════════════════════════════════ -->
+<?php if (isset($_SESSION['user_id'])): ?>
+  <div class="fav-overlay" id="favOverlay" style="display:none">
+    <div class="fav-modal" id="favModal">
+      <div class="fav-modal-head">
+        <span>💾 Sauvegarder dans…</span>
+        <button class="fav-close" id="favClose">✕</button>
+      </div>
+      <div class="fav-collections" id="favCollections"></div>
+      <div class="fav-new">
+        <input type="text" id="favNewInput" placeholder="Nouvelle collection…" maxlength="100">
+        <button id="favNewBtn">Créer</button>
+      </div>
+      <p class="fav-new-error" id="favNewError"></p>
+    </div>
+  </div>
+<?php endif; ?>
 
 <body>
 
@@ -232,7 +251,7 @@ $avg_review = count($reviews)
           <h1 class="ot-title"><?= htmlspecialchars($outil['nom']) ?></h1>
           <p class="ot-subtitle"><?= htmlspecialchars($outil['description'] ?? '') ?></p>
 
-          <!-- Score + CTA -->
+          <!-- Score + CTA + ajout favoris -->
           <div class="ot-hero-actions">
             <div class="ot-score-big">
               <span class="ot-star-big">★</span>
@@ -251,6 +270,19 @@ $avg_review = count($reviews)
                 </svg>
               </a>
             <?php endif; ?>
+
+            <!-- ❤ Bouton favori -->
+            <?php if (isset($_SESSION['user_id'])): ?>
+              <button class="ot-btn-fav js-fav-btn" data-id="<?= $outil['ID_OUTILS_IA'] ?>"
+                title="Sauvegarder dans une collection">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path
+                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+                Sauvegarder
+              </button>
+            <?php endif; ?>
+
             <a class="ot-btn-ghost" href="dashboard.php">← Retour</a>
           </div>
         </div>
