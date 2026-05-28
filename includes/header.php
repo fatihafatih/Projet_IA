@@ -15,7 +15,6 @@ if (session_status() === PHP_SESSION_NONE) {
 
     <nav class="nav-center">
         <a href="../php/dashboard.php">AI Tools</a>
-        <a href="add-tool.php">Add Tool</a>
     </nav>
 
     <div class="navbar-right">

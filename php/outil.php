@@ -43,6 +43,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rating'])) {
   }
 }
 
+// ── Suppression d'un avis ─────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_review'])) {
+  if (isset($_SESSION['user_id'])) {
+    $review_id = (int) $_POST['delete_review'];
+    $pdo->prepare("
+      DELETE FROM reviews WHERE ID_REVIEW = ? AND ID_USERS = ?
+    ")->execute([$review_id, $_SESSION['user_id']]);
+
+    $pdo->prepare("
+      UPDATE outils_ia
+      SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?)
+      WHERE ID_OUTILS_IA = ?
+    ")->execute([$id, $id]);
+
+    header("Location: outil.php?id=$id#avis");
+    exit;
+  }
+}
+
+// ── Modification d'un avis ────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_review'])) {
+  if (isset($_SESSION['user_id'])) {
+    $review_id = (int) $_POST['edit_review'];
+    $rating_edit = (int) $_POST['rating_edit'];
+    $comment_edit = trim($_POST['comment_edit'] ?? '');
+
+    if ($rating_edit >= 1 && $rating_edit <= 5) {
+      $pdo->prepare("
+        UPDATE reviews SET rating = ?, comment = ?
+        WHERE ID_REVIEW = ? AND ID_USERS = ?
+      ")->execute([$rating_edit, $comment_edit ?: null, $review_id, $_SESSION['user_id']]);
+
+      $pdo->prepare("
+        UPDATE outils_ia
+        SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?)
+        WHERE ID_OUTILS_IA = ?
+      ")->execute([$id, $id]);
+
+      header("Location: outil.php?id=$id#avis");
+      exit;
+    }
+  }
+}
+
 // ── Outil principal ──────────────────────────────────────────────────────────
 $stmt = $pdo->prepare("
     SELECT o.*, c.name AS categorie
@@ -141,7 +185,7 @@ $avg_review = count($reviews)
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($outil['nom']) ?> — Référentiel IA</title>
-  <link rel="stylesheet" href="../styles/style.css">
+  <link rel="stylesheet" href="../styles/outil.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
@@ -397,8 +441,9 @@ $avg_review = count($reviews)
             <div class="ot-reviews">
               <?php foreach ($reviews as $rev):
                 $stars = round($rev['rating']);
+                $is_own = isset($_SESSION['user_id']) && $_SESSION['user_id'] == $rev['ID_USERS'];
                 ?>
-                <div class="ot-review-card">
+                <div class="ot-review-card" id="review-<?= $rev['ID_REVIEW'] ?>">
                   <div class="ot-rev-header">
                     <div class="ot-rev-avatar">
                       <?php if ($rev['user_image']): ?>
@@ -416,17 +461,77 @@ $avg_review = count($reviews)
                         <span class="ot-rev-score"><?= number_format($rev['rating'], 1) ?></span>
                       </div>
                     </div>
+
+                    <!-- Actions si c'est son propre avis -->
+                    <?php if ($is_own): ?>
+                      <div class="ot-rev-actions">
+
+                        <button type="button" class="ot-rev-btn ot-rev-btn--edit js-edit-btn"
+                          data-id="<?= $rev['ID_REVIEW'] ?>" title="Modifier">
+                          <i class="bi bi-pencil-fill"></i>
+                        </button>
+                        <form method="POST" action="outil.php?id=<?= $id ?>" style="display:inline"
+                          onsubmit="return confirm('Supprimer cet avis ?')">
+                          <input type="hidden" name="delete_review" value="<?= $rev['ID_REVIEW'] ?>">
+                          <button type="submit" class="ot-rev-btn ot-rev-btn--delete" title="Supprimer">
+                            <i class="bi bi-trash-fill"></i>
+                          </button>
+                        </form>
+                      </div>
+                    <?php endif; ?>
                   </div>
+
                   <?php if ($rev['comment']): ?>
-                    <p class="ot-rev-comment">"<?= htmlspecialchars($rev['comment']) ?>"</p>
+                    <p class="ot-rev-comment" id="comment-text-<?= $rev['ID_REVIEW'] ?>">
+                      "<?= htmlspecialchars($rev['comment']) ?>"
+                    </p>
                   <?php endif; ?>
+
+                  <!-- Formulaire d'édition (caché par défaut) -->
+                  <?php if ($is_own): ?>
+                    <div class="ot-edit-form" id="edit-form-<?= $rev['ID_REVIEW'] ?>" style="display:none">
+                      <form method="POST" action="outil.php?id=<?= $id ?>">
+                        <input type="hidden" name="edit_review" value="<?= $rev['ID_REVIEW'] ?>">
+
+                        <!-- Étoiles édition -->
+                        <div class="ot-star-picker" id="editStarPicker-<?= $rev['ID_REVIEW'] ?>">
+                          <span class="ot-sp-label">Modifier la note</span>
+                          <div class="ot-stars-row">
+                            <?php for ($s = 1; $s <= 5; $s++): ?>
+                              <label class="ot-sp-star" for="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>">
+                                <input type="radio" name="rating_edit" id="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>"
+                                  value="<?= $s ?>" <?= $s == round($rev['rating']) ? 'checked' : '' ?>>
+                                <svg viewBox="0 0 24 24">
+                                  <path
+                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                </svg>
+                              </label>
+                            <?php endfor; ?>
+                          </div>
+                        </div>
+
+                        <textarea class="ot-form-textarea" name="comment_edit" rows="3"
+                          placeholder="Modifier votre commentaire…"><?= htmlspecialchars($rev['comment'] ?? '') ?></textarea>
+
+                        <div class="ot-edit-actions">
+                          <button type="submit" class="ot-btn-submit">
+                            <i class="bi bi-check-lg"></i> Enregistrer
+                          </button>
+                          <button type="button" class="ot-btn-ghost js-cancel-btn" data-id="<?= $rev['ID_REVIEW'] ?>">
+                            Annuler
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  <?php endif; ?>
+
                 </div>
               <?php endforeach; ?>
             </div>
           <?php else: ?>
             <div class="ot-empty-state">
               <span class="ot-empty-icon">💭</span>
-              <p>Aucun avis pour cet outil pour le moment. Soyez le premier !</p>
+              <p>Aucun avis pour cet outil pour le moment.</p>
             </div>
           <?php endif; ?>
 
@@ -503,7 +608,8 @@ $avg_review = count($reviews)
   </div><!-- /page -->
 
   <?php include "../includes/footer.php"; ?>
-  <script src="../js/outil.js"></script>
+  <script src="../js/outils.js"></script>
+
 </body>
 
 </html>
