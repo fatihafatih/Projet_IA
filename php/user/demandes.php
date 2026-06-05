@@ -31,6 +31,7 @@ $sql = "
         o.url,
         o.version,
         o.status,
+        o.refusal_cause,           /* ← ajouter cette ligne */
         c.name AS categorie_name
     FROM OUTILS_IA o
     LEFT JOIN CATEGORIE c ON o.ID_CATEGORIE = c.ID_CATEGORIE
@@ -39,6 +40,7 @@ $sql = "
 $params = [$userId];
 
 if ($filtre !== 'tous') {
+
     if ($filtre === 'refusé') {
         $sql .= " AND o.status IN ('refusé','inactif')";
     } else {
@@ -499,31 +501,71 @@ body::before {
                         </div>
                     </div>
 
-                    <?php if ($status === 'en_attente'): ?>
-                    <div class="dem-status-banner" style="background: #FFFBEB; color: #92400E;">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        Analyse en cours par nos modérateurs. Votre outil sera bientôt en ligne.
-                    </div>
-                    <?php elseif (in_array($status, ['refusé','inactif'])): ?>
-                    <div class="dem-status-banner" style="background: #FEF2F2; color: #B91C1C;">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                        </svg>
-                        Cette demande ne respecte pas nos critères d'éligibilité. Vous pouvez ajuster les informations.
-                        <?php if (!empty($o['refusal_cause'] ?? '')): ?>
-                        <div style="margin-top:10px;font-size:13px;line-height:1.5;color:#991b1b;">Motif&nbsp;: <?= htmlspecialchars($o['refusal_cause'] ?? '') ?></div>
-                        <?php endif; ?>
-                    </div>
-                    <?php elseif ($status === 'actif'): ?>
-                    <div class="dem-status-banner" style="background: #F0FDF4; color: #15803D;">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Félicitations ! Votre outil est officiellement publié et accessible.
-                    </div>
-                    <?php endif; ?>
+                  <?php if ($status === 'en_attente'): ?>
+    <div class="dem-status-banner" style="background:#FFFBEB;color:#92400E;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Analyse en cours par nos modérateurs. Votre outil sera bientôt en ligne.
+    </div>
+
+<?php elseif (in_array($status, ['refusé','inactif'])): ?>
+    <div style="border-radius:14px;overflow:hidden;margin-top:14px;border:1px solid #FECACA;">
+
+        <div style="background:#FEF2F2;border-bottom:1px solid #FECACA;padding:14px 18px;display:flex;align-items:center;gap:12px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:#FCEBEB;border:1px solid #FCA5A5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="16" height="16" fill="none" stroke="#A32D2D" stroke-width="2.5" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+            </div>
+            <div style="flex:1;">
+                <p style="margin:0;font-size:13px;font-weight:800;color:#7F1D1D;">Demande refusée</p>
+                <p style="margin:0;font-size:12px;color:#B91C1C;font-weight:600;">Cet outil ne respecte pas nos critères d'éligibilité</p>
+            </div>
+            <span style="background:#FCEBEB;border:1px solid #FCA5A5;border-radius:999px;padding:3px 12px;font-size:11px;font-weight:800;color:#7F1D1D;white-space:nowrap;font-family:'Nunito',sans-serif;">
+                Inactif
+            </span>
+        </div>
+
+        <div style="padding:16px 18px;background:#fff;">
+            <p style="margin:0 0 10px;font-size:11px;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;">Motif de refus</p>
+
+            <?php if (!empty($o['refusal_cause'])): ?>
+                <div style="background:#FEF2F2;border-left:4px solid #E24B4A;border-radius:0 10px 10px 0;padding:14px 16px;">
+                    <p style="margin:0;font-size:13.5px;color:#7F1D1D;line-height:1.7;font-weight:600;">
+                        <?= htmlspecialchars($o['refusal_cause']) ?>
+                    </p>
+                </div>
+            <?php else: ?>
+                <div style="background:#FEF2F2;border-left:4px solid #E24B4A;border-radius:0 10px 10px 0;padding:14px 16px;">
+                    <p style="margin:0;font-size:13.5px;color:#B91C1C;line-height:1.7;font-style:italic;">
+                        Aucun motif précisé par l'équipe de modération.
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+                <svg width="14" height="14" fill="none" stroke="#94A3B8" stroke-width="2" viewBox="0 0 24 24">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                <span style="font-size:12px;color:#94A3B8;font-weight:600;">Vous pouvez corriger les informations et resoumettre l'outil</span>
+            </div>
+        </div>
+
+    </div>
+
+<?php elseif ($status === 'actif'): ?>
+    <div class="dem-status-banner" style="background:#F0FDF4;color:#15803D;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Félicitations ! Votre outil est officiellement publié et accessible.
+    </div>
+
+<?php endif; ?>
 
                     <?php if (!empty($o['url'])): ?>
                     <div class="dem-card-action-bar">

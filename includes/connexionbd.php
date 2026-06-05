@@ -7,12 +7,14 @@ $host = 'localhost';
 $dbname = 'prj_ai';
 // $dbname = 'projet_ia';
 $port = 3307;
+
 $username = 'root';
 $password = '';
 
 try {
     $pdo = new PDO(
         "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8",
+
         $username,
         $password,
         [
@@ -24,3 +26,5 @@ try {
 } catch (PDOException $e) {
     die(json_encode(['error' => 'Connexion échouée : ' . $e->getMessage()]));
 }
+
+

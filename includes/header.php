@@ -18,8 +18,7 @@ if (session_status() === PHP_SESSION_NONE) {
     </nav>
 
     <div class="navbar-right">
-             <?php include "../php/auth.php"; ?>
-
+        <?php include "../php/auth.php"; ?>
     </div>
 
 </header>

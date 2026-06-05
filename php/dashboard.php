@@ -71,7 +71,7 @@ $total = count($outils);
       </p>
 
       <div class="search-wrap">
-        <img src="../public/logo1.png" alt="logo recherche" class="search-icon">
+        <img src="../public/recherche.png" alt="logo recherche" class="search-icon">
         <input type="text" id="searchInput" placeholder="Rechercher un outil, une catégorie…">
         <button class="btn-search" onclick="doSearch()">Rechercher</button>
       </div>

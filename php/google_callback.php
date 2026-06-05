@@ -1,10 +1,11 @@
 <?php
 session_start();
-require '../includes/connexionbd.php';
+ require '../includes/connexionbd.php';
 
-define('GOOGLE_CLIENT_ID',     'VOTRE_CLIENT_ID');
-define('GOOGLE_CLIENT_SECRET', 'VOTRE_CLIENT_SECRET');
-define('GOOGLE_REDIRECT_URI',  'http://localhost/PROJET_IA/php/google_callback.php');
+// // define('GOOGLE_CLIENT_ID',     'VOTRE_CLIENT_ID');
+// // define('GOOGLE_CLIENT_SECRET', 'VOTRE_CLIENT_SECRET');
+// // define('GOOGLE_REDIRECT_URI',  'http://localhost/PROJET_IA/php/google_callback.php');
+
 
 // Vérification sécurité
 if (!isset($_GET['state']) || $_GET['state'] !== $_SESSION['oauth_state']) {

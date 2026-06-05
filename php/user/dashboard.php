@@ -4,7 +4,8 @@ require 'layout.php';
 require_once '../../includes/connexionbd.php';
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+
+    header('Location: dashboard.php');
     exit;
 }
 
