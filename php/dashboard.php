@@ -1,3 +1,4 @@
+
 <?php
 require_once '../includes/connexionbd.php';
 
@@ -33,9 +34,8 @@ $total = count($outils);
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Référentiel d'outils IA</title>
-  <link rel="stylesheet" href="../styles/style.css">
+  <link rel="stylesheet" href="../styles/dashboard.css">
   <link rel="stylesheet" href="../styles/favoris.css">
-
 </head>
 <!-- ══ MODAL COLLECTIONS ══════════════════════════════════════════════════ -->
 <div class="fav-overlay" id="favOverlay" style="display:none">
