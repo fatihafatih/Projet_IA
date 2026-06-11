@@ -633,8 +633,8 @@ tr:hover td {
 
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="sidebar-logo-icon">✦</div>
-    <div class="sidebar-logo-text">MonApp</div>
+    <div class="sidebar-logo-icon"></div>
+    <div class="sidebar-logo-text">SearchIA</div>
   </div>
 
   <div class="sidebar-section">

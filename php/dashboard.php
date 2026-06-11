@@ -1,8 +1,8 @@
-
 <?php
+session_start();
 require_once '../includes/connexionbd.php';
 
-// Récupérer les outils actifs avec leur catégorie et score de performance moyen
+// Récupérer les outils actifs
 $stmt = $pdo->prepare("
     SELECT 
         o.ID_OUTILS_IA,
@@ -14,8 +14,6 @@ $stmt = $pdo->prepare("
         o.version,
         o.status,
         c.name AS categorie
-        -- Tarif minimum associé via les modèles (optionnel, si vous liez tarifs aux outils plus tard)
-        -- Pour l'instant on affiche juste le rating et la catégorie
     FROM outils_ia o
     LEFT JOIN categorie c ON o.ID_CATEGORIE = c.ID_CATEGORIE
     LEFT JOIN performance p ON p.ID_OUTILS_IA = o.ID_OUTILS_IA
@@ -26,6 +24,19 @@ $stmt = $pdo->prepare("
 $stmt->execute();
 $outils = $stmt->fetchAll();
 $total = count($outils);
+
+// ── IDs des outils déjà en favoris pour l'utilisateur connecté ──────────────
+// Table : favoris(ID_FAVORIS, ID_USERS, ID_OUTILS_IA, ID_COLLECTIONS)
+$fav_ids = [];
+if (isset($_SESSION['user_id'])) {
+  $fav_stmt = $pdo->prepare("
+        SELECT DISTINCT ID_OUTILS_IA
+        FROM favoris
+        WHERE ID_USERS = ?
+    ");
+  $fav_stmt->execute([$_SESSION['user_id']]);
+  $fav_ids = array_map('intval', $fav_stmt->fetchAll(PDO::FETCH_COLUMN));
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -37,6 +48,7 @@ $total = count($outils);
   <link rel="stylesheet" href="../styles/dashboard.css">
   <link rel="stylesheet" href="../styles/favoris.css">
 </head>
+
 <!-- ══ MODAL COLLECTIONS ══════════════════════════════════════════════════ -->
 <div class="fav-overlay" id="favOverlay" style="display:none">
   <div class="fav-modal" id="favModal">
@@ -44,11 +56,7 @@ $total = count($outils);
       <span>💾 Sauvegarder dans…</span>
       <button class="fav-close" id="favClose">✕</button>
     </div>
-
-    <div class="fav-collections" id="favCollections">
-      <!-- rempli par JS -->
-    </div>
-
+    <div class="fav-collections" id="favCollections"></div>
     <div class="fav-new" id="favNewWrap">
       <input type="text" id="favNewInput" placeholder="Nom de la nouvelle collection…" maxlength="100">
       <button id="favNewBtn">Créer</button>
@@ -86,9 +94,6 @@ $total = count($outils);
             <span class="pill" data-cat="<?= htmlspecialchars($c) ?>">
               <?= htmlspecialchars($c) ?>
             </span>
-            <!-- data-* est une famille d’attributs HTML personnalisés qui permet de stocker des données 
-            supplémentaires sur un élément, souvent pour JavaScript.
-            En JavaScript on y accède avec :element.dataset.cat -->
           <?php endif; endforeach; ?>
       </div>
     </div>
@@ -120,6 +125,7 @@ $total = count($outils);
         $hidden = $i >= 6 ? 'd-none' : '';
         $rating = number_format($o['global_rating'], 1);
         $version = $o['version'] ? 'v' . number_format($o['version'], 1) : '';
+        $is_fav = in_array((int) $o['ID_OUTILS_IA'], $fav_ids);
         ?>
         <div class="model-item <?= $hidden ?>" data-nom="<?= strtolower(htmlspecialchars($o['nom'])) ?>"
           data-cat="<?= strtolower(htmlspecialchars($o['categorie'] ?? '')) ?>"
@@ -128,7 +134,6 @@ $total = count($outils);
 
           <div class="card">
             <div class="card-top">
-              <!-- Logo -->
               <div class="c-logo">
                 <?php if ($o['logo_url']): ?>
                   <img src="<?= htmlspecialchars($o['logo_url']) ?>" alt="<?= htmlspecialchars($o['nom']) ?>">
@@ -136,8 +141,6 @@ $total = count($outils);
                   <div class="c-logo-placeholder">IA</div>
                 <?php endif; ?>
               </div>
-
-              <!-- Nom + catégorie + version -->
               <div style="min-width:0;">
                 <div class="c-name"><?= htmlspecialchars($o['nom']) ?></div>
                 <span class="c-cat"><?= htmlspecialchars($o['categorie'] ?? 'Non classé') ?></span>
@@ -147,20 +150,19 @@ $total = count($outils);
               </div>
             </div>
 
-            <!-- Description -->
             <p class="c-desc">
               <?= htmlspecialchars($o['description'] ?: 'Aucune description disponible.') ?>
             </p>
 
-            <!-- Footer carte : note + lien + ajouter favoris-->
             <div class="c-foot">
               <span class="c-rating">★ <?= $rating ?></span>
 
               <div style="display:flex; align-items:center; gap:8px;">
-                <!-- ❤ Bouton favori -->
                 <?php if (isset($_SESSION['user_id'])): ?>
-                  <button class="btn-fav js-fav-btn" data-id="<?= $o['ID_OUTILS_IA'] ?>" title="Ajouter aux favoris">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <button class="btn-fav js-fav-btn <?= $is_fav ? 'is-fav' : '' ?>" data-id="<?= $o['ID_OUTILS_IA'] ?>"
+                    title="<?= $is_fav ? 'Retirer des favoris' : 'Ajouter aux favoris' ?>">
+                    <svg viewBox="0 0 24 24" fill="<?= $is_fav ? '#E8455A' : 'none' ?>"
+                      stroke="<?= $is_fav ? '#E8455A' : 'currentColor' ?>" stroke-width="2">
                       <path
                         d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                     </svg>
@@ -190,6 +192,7 @@ $total = count($outils);
 
   </main>
 
+  <?php include 'statistique.php'; ?>
   <?php include "../includes/footer.php"; ?>
 
   <script src="../js/dashboard.js"></script>

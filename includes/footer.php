@@ -19,7 +19,7 @@
       </div>
       <div class="tf-card">
         <div class="tf-avatar av4">KI</div>
-        <span>Khayat Israa</span>
+        <span>Khayat Israe</span>
       </div>
     </div>
   </div>

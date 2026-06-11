@@ -6,7 +6,6 @@ session_start();
 // // define('GOOGLE_CLIENT_SECRET', 'VOTRE_CLIENT_SECRET');
 // // define('GOOGLE_REDIRECT_URI',  'http://localhost/PROJET_IA/php/google_callback.php');
 
-
 // Vérification sécurité
 if (!isset($_GET['state']) || $_GET['state'] !== $_SESSION['oauth_state']) {
     header('Location:/PROJET_IA/php/dashboard.php?error=state');
@@ -60,7 +59,7 @@ $stmt->execute([$email]);
 $user = $stmt->fetch();
 
 if (!$user) {
-    $pdo->prepare("INSERT INTO users (nom, email, password, role) VALUES (?, ?, '', 'visiteur')")
+    $pdo->prepare("INSERT INTO users (nom, email, password, role) VALUES (?, ?, '', 'adherent')")
          ->execute([$nom, $email]);
     $stmt->execute([$email]);
     $user = $stmt->fetch();

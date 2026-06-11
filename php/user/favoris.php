@@ -32,6 +32,25 @@ if (isset($_GET['remove']) && is_numeric($_GET['remove'])) {
     exit;
 }
 
+if (isset($_GET['delete_collection']) && is_numeric($_GET['delete_collection'])) {
+    $collectionId = (int) $_GET['delete_collection'];
+
+    $stmt = $pdo->prepare("SELECT name FROM collections WHERE ID_COLLECTIONS = ? AND ID_USERS = ?");
+    $stmt->execute([$collectionId, $userId]);
+    $collection = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($collection && strtolower($collection['name']) !== 'mes favoris') {
+        $pdo->prepare("DELETE FROM favoris WHERE ID_COLLECTIONS = ? AND ID_USERS = ?")
+            ->execute([$collectionId, $userId]);
+        $pdo->prepare("DELETE FROM collections WHERE ID_COLLECTIONS = ? AND ID_USERS = ?")
+            ->execute([$collectionId, $userId]);
+    }
+
+    $catParam = isset($_GET['cat']) ? '&cat=' . urlencode($_GET['cat']) : '';
+    header('Location: favoris.php?col=tous' . $catParam);
+    exit;
+}
+
 $pageTitle = 'Mon Espace Favoris';
 require 'layout.php';
 
@@ -171,6 +190,30 @@ body::before {
     background: var(--gold, #F5B800);
     border-radius: 12px 12px 0 0;
 }
+.collection-tab-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+.collection-delete {
+    position: absolute;
+    top: 12px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #000000;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 10;
+    padding: 0 2px;
+}
+.collection-delete:hover {
+    text-decoration: none;
+    opacity: 0.85;
+}
 
 .card-collection-tag {
     display: inline-flex;
@@ -218,11 +261,21 @@ body::before {
 
             <?php foreach ($userCollections as $col): ?>
                 <?php $isCurrent = ($filtreCollection == $col['ID_COLLECTIONS']); ?>
-                <a href="?cat=<?= urlencode($filtreCategorie) ?>&col=<?= $col['ID_COLLECTIONS'] ?>" 
-                   class="collection-tab <?= $isCurrent ? 'active' : '' ?>">
-                    <span><?= $isCurrent ? '📂' : '📁' ?></span>
-                    <?= htmlspecialchars($col['name']) ?>
-                </a>
+                <div class="collection-tab-wrapper">
+                    <a href="?cat=<?= urlencode($filtreCategorie) ?>&col=<?= $col['ID_COLLECTIONS'] ?>" 
+                       class="collection-tab <?= $isCurrent ? 'active' : '' ?>">
+                        <span><?= $isCurrent ? '📂' : '📁' ?></span>
+                        <?= htmlspecialchars($col['name']) ?>
+                    </a>
+                    <?php if (strtolower($col['name']) !== 'mes favoris'): ?>
+                        <a href="?delete_collection=<?= $col['ID_COLLECTIONS'] ?>&cat=<?= urlencode($filtreCategorie) ?>"
+                           class="collection-delete"
+                           title="Supprimer cette collection"
+                           onclick="return confirm('Supprimer cette collection ? Cela supprimera aussi les favoris qu\'elle contient.');">
+                            ✕
+                        </a>
+                    <?php endif; ?>
+                </div>
             <?php endforeach; ?>
         </div>
     </div>

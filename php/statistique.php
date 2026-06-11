@@ -6,7 +6,6 @@ ini_set('display_errors', 1);
 require_once '../includes/connexionbd.php';
 
 // ─── Filtre status : enum('actif','inactif','en_attente') ─────────────────────
-// Dans outils_ia, les outils publiés ont status = 'actif'
 $status_filter = "WHERE o.status = 'actif'";
 $AND           = "AND";
 
@@ -60,16 +59,6 @@ try {
     $stats['tarif_periodes'] = $pdo->query(
         "SELECT periode, COUNT(*) AS count FROM tarif GROUP BY periode ORDER BY count DESC"
     )->fetchAll() ?: [];
-
-    // ── Tranches de prix (tarif) ─────────────────────────────────────────────────
-    $stats['price_ranges'] = $pdo->query(
-        "SELECT
-            SUM(CASE WHEN prix = 0 OR prix IS NULL THEN 1 ELSE 0 END) AS gratuit,
-            SUM(CASE WHEN prix > 0 AND prix <= 10  THEN 1 ELSE 0 END) AS low,
-            SUM(CASE WHEN prix > 10 AND prix <= 20 THEN 1 ELSE 0 END) AS mid,
-            SUM(CASE WHEN prix > 20                THEN 1 ELSE 0 END) AS high
-         FROM tarif"
-    )->fetch();
 
     // ── Performance : moyennes globales ─────────────────────────────────────────
     $row = $pdo->query(
@@ -138,16 +127,6 @@ try {
          LIMIT 5"
     )->fetchAll() ?: [];
 
-    // ── Top 5 Global Rating (outils_ia.global_rating) ───────────────────────────
-    $stats['top_rating'] = $pdo->query(
-        "SELECT o.nom, o.logo_url AS logo, c.name AS categorie, o.global_rating
-         FROM outils_ia o
-         LEFT JOIN categorie c ON c.ID_CATEGORIE = o.ID_CATEGORIE
-         WHERE o.status = 'actif' AND o.global_rating IS NOT NULL
-         ORDER BY o.global_rating DESC
-         LIMIT 5"
-    )->fetchAll() ?: [];
-
     // ── Reviews : moyenne par outil ──────────────────────────────────────────────
     $stats['top_reviewed'] = $pdo->query(
         "SELECT o.nom, o.logo_url AS logo, c.name AS categorie,
@@ -162,11 +141,6 @@ try {
          LIMIT 5"
     )->fetchAll() ?: [];
 
-    // ── Distribution des statuts d'outils ────────────────────────────────────────
-    $stats['status_dist'] = $pdo->query(
-        "SELECT status, COUNT(*) AS count FROM outils_ia GROUP BY status"
-    )->fetchAll() ?: [];
-
     // ── Contributions : outils créés par utilisateur ─────────────────────────────
     $stats['models_by_user'] = $pdo->query(
         "SELECT u.nom, COUNT(o.ID_OUTILS_IA) AS count, u.role
@@ -175,15 +149,6 @@ try {
          GROUP BY u.id, u.nom, u.role
          ORDER BY count DESC
          LIMIT 8"
-    )->fetchAll() ?: [];
-
-    // ── Tarif : prix moyen par période ───────────────────────────────────────────
-    $stats['avg_price_by_periode'] = $pdo->query(
-        "SELECT periode, ROUND(AVG(prix), 2) AS avg_price, COUNT(*) AS count
-         FROM tarif
-         WHERE prix > 0
-         GROUP BY periode
-         ORDER BY avg_price DESC"
     )->fetchAll() ?: [];
 
     // ── Statistiques globales ────────────────────────────────────────────────────
@@ -217,14 +182,8 @@ $js = [
     'perf_cat_labels' => array_column($stats['perf_by_category'],    'categorie'),
     'perf_cat_scores' => array_map('floatval', array_column($stats['perf_by_category'], 'avg_score')),
     'perf_cat_rapid'  => array_map('floatval', array_column($stats['perf_by_category'], 'avg_rapidite')),
-    'periode_labels'  => array_column($stats['tarif_periodes'],      'periode'),
-    'periode_counts'  => array_map('intval', array_column($stats['tarif_periodes'], 'count')),
-    'price_per_labels'=> array_column($stats['avg_price_by_periode'],'periode'),
-    'price_per_values'=> array_map('floatval', array_column($stats['avg_price_by_periode'], 'avg_price')),
     'user_labels'     => array_column($stats['models_by_user'],      'nom'),
     'user_counts'     => array_map('intval', array_column($stats['models_by_user'], 'count')),
-    'status_labels'   => array_column($stats['status_dist'],         'status'),
-    'status_counts'   => array_map('intval', array_column($stats['status_dist'], 'count')),
 ];
 foreach ($js as &$v) { if (empty($v)) $v = []; }
 unset($v);
@@ -232,11 +191,11 @@ $json = array_map('json_encode', $js);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function model_img(string $img, string $alt, string $size = '44px'): string {
-    $ph = 'https://ui-avatars.com/api/?name='.urlencode($alt).'&background=1a1f2e&color=6c8ebf&size=128&bold=true&length=2';
+    $ph = 'https://ui-avatars.com/api/?name='.urlencode($alt).'&background=1B2A4A&color=F3E5AB&size=128&bold=true&length=2';
     $src = !empty($img) ? htmlspecialchars($img) : $ph;
     return '<img src="'.$src.'" alt="'.htmlspecialchars($alt).'"
                  onerror="this.src=\''.addslashes($ph).'\'"
-                 style="width:'.$size.';height:'.$size.';object-fit:cover;border-radius:10px;border:2px solid rgba(255,255,255,.08);flex-shrink:0;">';
+                 style="width:'.$size.';height:'.$size.';object-fit:cover;border-radius:10px;border:2px solid rgba(243,229,171,.12);flex-shrink:0;">';
 }
 
 function rating_badge(float $v): string {
@@ -248,7 +207,7 @@ function rating_badge(float $v): string {
 
 function score_bar(float $v, float $max=10, string $color='--ac1'): string {
     $pct = $max > 0 ? min(100, ($v/$max)*100) : 0;
-    return '<div class="sbar"><div class="sbar-fill" style="width:'.$pct.'%;background:var('.$color.')"></div></div>';
+    return '<div class="sbar"><div class="sbar-fill" style="width:'.$pct.'%"></div></div>';
 }
 ?>
 <!DOCTYPE html>
@@ -261,134 +220,178 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="../styles/statistique.css">
+<style>
+/* ============================================================
+   LIGHT CARDS — NAVY #1B2A4A / GOLD #F3E5AB
+   ============================================================ */
+:root{
+  --bg-page:#f0ece0;
+  --bg-card:#fffdf5;
+  --bg-card2:#fdf8ec;
+  --navy:#1B2A4A;
+  --navy-mid:#263d6b;
+  --navy-light:#e8edf5;
+  --gold:#b8940a;
+  --gold-soft:#F3E5AB;
+  --gold-bg:#fdf5d0;
+  --text:#1a2236;
+  --text-muted:#6b7a94;
+  --border:rgba(27,42,74,.10);
+  --border-hv:rgba(27,42,74,.22);
+  --ac2:#c9a80e;
+  --ac3:#1B2A4A;
+  --ac4:#d97706;
+  --ac5:#0d7a55;
+  --ac6:#7c3aed;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:
+    radial-gradient(ellipse at top left,rgba(243,229,171,.35) 0%,transparent 45%),
+    radial-gradient(ellipse at bottom right,rgba(27,42,74,.12) 0%,transparent 50%),
+    var(--bg-page);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  min-height:100vh;
+  line-height:1.6;
+}
+
+/* HEADER */
+.hdr{
+  position:relative;overflow:hidden;min-height:300px;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+  padding:60px 24px 50px;
+  background:linear-gradient(160deg,var(--navy) 0%,#0f1e38 100%);
+  border-bottom:3px solid var(--gold-soft);
+}
+.hdr::before{content:'';position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(243,229,171,.10),transparent 70%);top:-300px;left:-150px;pointer-events:none}
+.hdr::after{content:'AI ANALYTICS';position:absolute;font-size:9rem;font-weight:800;font-family:'Syne',sans-serif;opacity:.04;white-space:nowrap;pointer-events:none;color:var(--gold-soft);letter-spacing:.15em}
+.hdr-tag{display:inline-flex;align-items:center;gap:8px;font-size:.75rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-soft);background:rgba(243,229,171,.12);border:1px solid rgba(243,229,171,.28);border-radius:100px;padding:6px 16px;margin-bottom:22px}
+.hdr h1{font-family:'Syne',sans-serif;font-size:clamp(2rem,5vw,3.4rem);font-weight:800;color:#fff;letter-spacing:-.01em;line-height:1.15;margin-bottom:14px}
+.hdr h1 span{color:var(--gold-soft);-webkit-text-fill-color:var(--gold-soft)}
+.hdr p{color:rgba(243,229,171,.65);font-size:1rem;max-width:500px;margin-bottom:24px}
+.status-pill{display:inline-flex;align-items:center;gap:7px;font-size:.78rem;font-weight:500;padding:7px 18px;border-radius:100px}
+.status-pill.ok{background:rgba(13,122,85,.15);border:1px solid rgba(13,122,85,.35);color:#10b981}
+
+/* WRAPPER */
+.wrap{max-width:1400px;margin:0 auto;padding:50px 28px 80px}
+
+/* SECTION */
+.sec{margin-bottom:56px;opacity:0;transform:translateY(28px);transition:opacity .55s ease,transform .55s ease}
+.sec.visible{opacity:1;transform:none}
+.sec-title{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.sec-title .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;box-shadow:0 0 12px currentColor}
+.sec-title h2{font-family:'Syne',sans-serif;font-size:1.05rem;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);font-weight:700}
+
+/* GRIDS */
+.g2{display:grid;gap:22px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+
+/* KPI */
+.kpi{position:relative;overflow:hidden;background:var(--bg-card) !important;border:1px solid var(--border);border-radius:20px;padding:26px 24px;transition:.32s ease;box-shadow:0 2px 12px rgba(27,42,74,.07)}
+.kpi::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(243,229,171,.18),transparent 60%);pointer-events:none}
+.kpi:hover{transform:translateY(-7px);border-color:var(--border-hv);box-shadow:0 18px 40px rgba(27,42,74,.14),0 0 0 3px rgba(243,229,171,.4)}
+.kpi-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;margin-bottom:16px;background:var(--navy);color:var(--gold-soft)}
+.kpi-num{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;color:var(--navy);line-height:1;margin-bottom:6px}
+.kpi-label{font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.kpi-sub{font-size:.78rem;color:var(--text-muted);margin-top:4px}
+
+/* CHART & TOP CARDS */
+.cc,.tc{
+  position:relative;overflow:hidden;
+  background:var(--bg-card) !important;
+  border:1px solid var(--border);
+  border-radius:20px;
+  transition:.32s ease;
+  box-shadow:0 2px 12px rgba(27,42,74,.07);
+}
+.cc:hover,.tc:hover{transform:translateY(-7px);border-color:var(--border-hv);box-shadow:0 18px 40px rgba(27,42,74,.12),0 0 0 3px rgba(243,229,171,.45)}
+/* bande navy+or en haut */
+.cc::before,.tc::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--navy),var(--gold-soft));border-radius:20px 20px 0 0;pointer-events:none}
+
+.cc-head,.tc-head{display:flex;align-items:center;justify-content:space-between;padding:22px 22px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)}
+.tc-head{justify-content:flex-start}
+.cc-title,.tc-title{display:flex;align-items:center;gap:9px;font-size:.85rem;font-weight:700;color:var(--navy);letter-spacing:.03em}
+
+.cc-body{padding:20px;height:260px;position:relative;background:var(--bg-card)}
+.cc-body canvas{max-height:100%}
+.donut-wrap{display:flex;align-items:center;justify-content:center;position:relative}
+.donut-center{position:absolute;text-align:center;pointer-events:none}
+.donut-center strong{display:block;font-family:'Syne',sans-serif;font-size:1.9rem;font-weight:800;color:var(--navy)}
+.donut-center small{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+
+.cc-dl{width:34px;height:34px;border:1px solid var(--border);cursor:pointer;border-radius:10px;background:var(--navy-light);color:var(--navy);font-size:.8rem;transition:.22s ease;display:flex;align-items:center;justify-content:center}
+.cc-dl:hover{background:var(--navy);color:var(--gold-soft);transform:scale(1.08)}
+
+/* RANKING LIST */
+.rlist{display:flex;flex-direction:column;gap:10px;padding:16px 18px;background:var(--bg-card)}
+.ri{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg-card2);border:1px solid var(--border);border-radius:14px;transition:.22s ease}
+.ri:hover{transform:translateX(6px);background:var(--navy-light);border-color:rgba(27,42,74,.25)}
+.ri-rank{width:26px;height:26px;border-radius:8px;background:var(--navy);color:var(--gold-soft);font-size:.76rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ri-info{flex:1;min-width:0}
+.ri-name{font-size:.88rem;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-sub{font-size:.73rem;color:var(--text-muted);margin-top:2px}
+.ri-val{font-size:.82rem;font-weight:700;white-space:nowrap;flex-shrink:0}
+
+/* BARS */
+.sbar{height:5px;background:rgba(27,42,74,.10);border-radius:20px;margin-top:6px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--navy),#F3E5AB) !important;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.pbar{height:7px;background:rgba(27,42,74,.08);border-radius:20px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--navy),#4d9de0,#F3E5AB);transition:width .9s cubic-bezier(.4,0,.2,1)}
+
+/* BADGES */
+.ib{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;font-weight:700;padding:4px 10px;border-radius:100px}
+.ib-s1{background:var(--gold-bg);color:var(--gold);border:1px solid rgba(184,148,10,.25)}
+.ib-s2{background:#fef3c7;color:#92400e;border:1px solid rgba(146,64,14,.2)}
+.ib-s3{background:#d1fae5;color:#065f46;border:1px solid rgba(6,95,70,.2)}
+.ib-s4{background:var(--navy-light);color:var(--navy-mid);border:1px solid var(--border)}
+
+/* NO DATA */
+.nodata{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:100%;color:var(--text-muted);font-size:.85rem}
+.nodata i{font-size:1.6rem;opacity:.35}
+
+/* SUMMARY */
+.dashboard-summary{margin-top:60px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}
+.summary-card{position:relative;overflow:hidden;padding:30px 26px;border-radius:20px;text-align:center;background:var(--navy);border:1px solid rgba(243,229,171,.18);transition:.32s ease;box-shadow:0 4px 20px rgba(27,42,74,.20)}
+.summary-card:hover{transform:translateY(-8px);box-shadow:0 20px 44px rgba(27,42,74,.28),0 0 0 3px rgba(243,229,171,.30)}
+.summary-card::before{content:'';position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(243,229,171,.05);top:-90px;right:-90px}
+.summary-card i{font-size:2rem;margin-bottom:12px;color:var(--gold-soft)}
+.summary-card h3{font-family:'Syne',sans-serif;font-size:2.8rem;font-weight:800;color:var(--gold-soft)}
+.summary-card span{font-size:.8rem;color:rgba(243,229,171,.60);letter-spacing:.06em;text-transform:uppercase}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:var(--bg-page)}
+::-webkit-scrollbar-thumb{background:rgba(27,42,74,.25);border-radius:20px}
+::-webkit-scrollbar-thumb:hover{background:var(--navy)}
+</style>
 </head>
 <body>
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="hdr-tag"><i class="fas fa-chart-mixed"></i> Intelligence Dashboard</div>
   <h1>Statistiques <span>AI OUTILS</span></h1>
   <p>Analyse complète de votre bibliothèque de modèles d'intelligence artificielle</p>
-  <div class="status-pill ok"><i class="fas fa-circle-check"></i> Filtre actif : status = actif</div>
 </div>
 
 <div class="wrap">
-
-<!-- ═══════════════════════════════════════════════════════════
-     KPI – VUE D'ENSEMBLE
-═══════════════════════════════════════════════════════════ -->
-<div class="sec" data-reveal>
-  <div class="sec-title">
-    <div class="dot" style="background:var(--ac1)"></div>
-    <h2>Vue d'ensemble</h2>
-    <span class="count"><?php echo date('d/m/Y'); ?></span>
-  </div>
-  <div class="kpi-grid">
-    <div class="kpi c1">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num" data-target="<?php echo $stats['total_models']; ?>">0</div>
-          <div class="kpi-label">Outils IA actifs</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-robot"></i></div>
-      </div>
-      <div class="kpi-sub">
-        <span class="neutral"><i class="fas fa-clock"></i> <?php echo $stats['total_en_attente']; ?> en attente</span>
-      </div>
-    </div>
-    <div class="kpi c2">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num" data-target="<?php echo $stats['global']['nb_categories']; ?>">0</div>
-          <div class="kpi-label">Catégories</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-layer-group"></i></div>
-      </div>
-      <div class="kpi-sub"><span class="neutral"><i class="fas fa-tag"></i> types distincts</span></div>
-    </div>
-    <div class="kpi c3">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num" data-target="<?php echo $stats['pricing']['free']; ?>">0</div>
-          <div class="kpi-label">Plans Gratuits</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-gift"></i></div>
-      </div>
-      <div class="kpi-sub">
-        <span class="up"><?php echo $stats['total_tarifs'] > 0 ? round(($stats['pricing']['free']/$stats['total_tarifs'])*100) : 0; ?>%</span>
-        <span class="neutral"> des plans</span>
-      </div>
-    </div>
-    <div class="kpi c4">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num" data-target="<?php echo $stats['pricing']['paid']; ?>">0</div>
-          <div class="kpi-label">Plans Payants</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-credit-card"></i></div>
-      </div>
-      <div class="kpi-sub">
-        <span class="neutral">Moy. <?php echo number_format($stats['global']['avg_price_paid'],2); ?> €/plan</span>
-      </div>
-    </div>
-    <div class="kpi c5">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num" data-target="<?php echo $stats['total_users']; ?>">0</div>
-          <div class="kpi-label">Utilisateurs</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-users"></i></div>
-      </div>
-      <div class="kpi-sub"><span class="neutral"><i class="fas fa-user-shield"></i> <?php echo $stats['total_admins']; ?> admins</span></div>
-    </div>
-    <div class="kpi c6">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num" data-target="<?php echo $stats['total_adherents']; ?>">0</div>
-          <div class="kpi-label">Adhérents</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-id-card"></i></div>
-      </div>
-      <div class="kpi-sub"><span class="neutral"><?php echo $stats['total_visitors']; ?> visiteurs</span></div>
-    </div>
-    <div class="kpi c7">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num"><?php echo number_format($stats['perf_avg']['score_global'],1); ?></div>
-          <div class="kpi-label">Score Global Moy. /10</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-bolt"></i></div>
-      </div>
-      <div class="kpi-sub"><span class="up"><i class="fas fa-tachometer-alt"></i> Performance globale</span></div>
-    </div>
-    <div class="kpi c8">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-num"><?php echo number_format($stats['global']['avg_global_rating'],2); ?></div>
-          <div class="kpi-label">Rating Global Moy.</div>
-        </div>
-        <div class="kpi-ico"><i class="fas fa-star"></i></div>
-      </div>
-      <div class="kpi-sub"><span class="neutral">Note moyenne des outils</span></div>
-    </div>
-  </div>
-</div>
 
 <!-- ═══════════════════════════════════════════════════════════
      CHARTS – DISTRIBUTION
 ═══════════════════════════════════════════════════════════ -->
 <div class="sec" data-reveal>
   <div class="sec-title">
-    <div class="dot" style="background:var(--ac3)"></div>
+    <div class="dot" style="background:var(--ac2)"></div>
     <h2>Distribution & Répartition</h2>
   </div>
-  <div class="g2 g3" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+  <div class="g2 g3">
 
     <!-- Outils par Catégorie -->
     <div class="cc">
       <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-chart-pie" style="color:var(--ac1)"></i> Outils par Catégorie</div>
+        <div class="cc-title"><i class="fas fa-chart-pie" style="color:var(--gold)"></i> Outils par Catégorie</div>
         <button class="cc-dl" onclick="dlChart('catChart')" title="Télécharger"><i class="fas fa-download"></i></button>
       </div>
       <div class="cc-body">
@@ -401,7 +404,7 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
     <!-- Plans Gratuits vs Payants -->
     <div class="cc">
       <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-circle-half-stroke" style="color:var(--ac3)"></i> Plans Gratuits vs Payants</div>
+        <div class="cc-title"><i class="fas fa-circle-half-stroke" style="color:var(--ac4)"></i> Plans Gratuits vs Payants</div>
         <button class="cc-dl" onclick="dlChart('priceDoughnut')" title="Télécharger"><i class="fas fa-download"></i></button>
       </div>
       <div class="cc-body donut-wrap">
@@ -415,23 +418,10 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
       </div>
     </div>
 
-    <!-- Statut des outils -->
-    <div class="cc">
-      <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-circle-check" style="color:var(--ac5)"></i> Statut des Outils</div>
-        <button class="cc-dl" onclick="dlChart('statusChart')" title="Télécharger"><i class="fas fa-download"></i></button>
-      </div>
-      <div class="cc-body donut-wrap">
-        <?php if(!empty($stats['status_dist'])): ?>
-          <canvas id="statusChart"></canvas>
-        <?php else: ?><div class="nodata"><i class="fas fa-inbox"></i>Aucune donnée</div><?php endif; ?>
-      </div>
-    </div>
-
     <!-- Score par Catégorie -->
     <div class="cc">
       <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-tachometer-alt" style="color:var(--ac2)"></i> Score Global / Catégorie</div>
+        <div class="cc-title"><i class="fas fa-tachometer-alt" style="color:var(--ac3)"></i> Score Global / Catégorie</div>
         <button class="cc-dl" onclick="dlChart('perfCatChart')" title="Télécharger"><i class="fas fa-download"></i></button>
       </div>
       <div class="cc-body">
@@ -441,36 +431,10 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
       </div>
     </div>
 
-    <!-- Périodes de tarif -->
-    <div class="cc">
-      <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-calendar-alt" style="color:var(--ac6)"></i> Plans par Période</div>
-        <button class="cc-dl" onclick="dlChart('periodeChart')" title="Télécharger"><i class="fas fa-download"></i></button>
-      </div>
-      <div class="cc-body donut-wrap">
-        <?php if(!empty($stats['tarif_periodes'])): ?>
-          <canvas id="periodeChart"></canvas>
-        <?php else: ?><div class="nodata"><i class="fas fa-inbox"></i>Aucune donnée</div><?php endif; ?>
-      </div>
-    </div>
-
-    <!-- Prix moyen par période -->
-    <div class="cc">
-      <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-euro-sign" style="color:var(--ac4)"></i> Prix Moyen par Période</div>
-        <button class="cc-dl" onclick="dlChart('pricePeriodeChart')" title="Télécharger"><i class="fas fa-download"></i></button>
-      </div>
-      <div class="cc-body">
-        <?php if(!empty($stats['avg_price_by_periode'])): ?>
-          <canvas id="pricePeriodeChart"></canvas>
-        <?php else: ?><div class="nodata"><i class="fas fa-inbox"></i>Aucun plan payant</div><?php endif; ?>
-      </div>
-    </div>
-
     <!-- Rapidité par catégorie -->
     <div class="cc">
       <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-rocket" style="color:var(--ac3)"></i> Rapidité Moy. / Catégorie</div>
+        <div class="cc-title"><i class="fas fa-rocket" style="color:var(--ac2)"></i> Rapidité Moy. / Catégorie</div>
         <button class="cc-dl" onclick="dlChart('rapCatChart')" title="Télécharger"><i class="fas fa-download"></i></button>
       </div>
       <div class="cc-body">
@@ -480,49 +444,8 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
       </div>
     </div>
 
-    <!-- Contributions utilisateurs -->
-    <div class="cc">
-      <div class="cc-head">
-        <div class="cc-title"><i class="fas fa-users" style="color:var(--ac5)"></i> Outils créés par Utilisateur</div>
-        <button class="cc-dl" onclick="dlChart('userChart')" title="Télécharger"><i class="fas fa-download"></i></button>
-      </div>
-      <div class="cc-body">
-        <?php if(!empty($stats['models_by_user'])): ?>
-          <canvas id="userChart"></canvas>
-        <?php else: ?><div class="nodata"><i class="fas fa-inbox"></i>Aucune donnée</div><?php endif; ?>
-      </div>
-    </div>
+  
 
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     TRANCHES DE PRIX
-═══════════════════════════════════════════════════════════ -->
-<div class="sec" data-reveal>
-  <div class="sec-title">
-    <div class="dot" style="background:var(--ac4)"></div>
-    <h2>Analyse des Plans Tarifaires</h2>
-  </div>
-  <div class="cc" style="margin-bottom:0">
-    <div class="cc-head"><div class="cc-title"><i class="fas fa-tags" style="color:var(--ac4)"></i> Tranches de Prix</div></div>
-    <div class="price-range-grid">
-      <?php
-        $pr = $stats['price_ranges'] ?? [];
-        $pr_data = [
-          ['label'=>'Gratuits',  'val'=>(int)($pr['gratuit']??0), 'color'=>'var(--ac3)', 'icon'=>'fa-gift'],
-          ['label'=>'≤ 10 €',   'val'=>(int)($pr['low']??0),     'color'=>'var(--ac1)', 'icon'=>'fa-euro-sign'],
-          ['label'=>'10 – 20 €','val'=>(int)($pr['mid']??0),     'color'=>'var(--ac4)', 'icon'=>'fa-coins'],
-          ['label'=>'> 20 €',   'val'=>(int)($pr['high']??0),    'color'=>'var(--ac2)', 'icon'=>'fa-gem'],
-        ];
-        foreach($pr_data as $p): ?>
-        <div class="pr-pill">
-          <div style="color:<?php echo $p['color']; ?>;font-size:1.1rem;margin-bottom:6px"><i class="fas <?php echo $p['icon']; ?>"></i></div>
-          <div class="pr-n" style="color:<?php echo $p['color']; ?>"><?php echo $p['val']; ?></div>
-          <div class="pr-l"><?php echo $p['label']; ?></div>
-        </div>
-      <?php endforeach; ?>
-    </div>
   </div>
 </div>
 
@@ -531,14 +454,14 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
 ═══════════════════════════════════════════════════════════ -->
 <div class="sec" data-reveal>
   <div class="sec-title">
-    <div class="dot" style="background:var(--ac4)"></div>
+    <div class="dot" style="background:var(--gold)"></div>
     <h2>Classements Top 5</h2>
   </div>
   <div class="g2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
 
     <!-- Top Score Global -->
     <div class="tc">
-      <div class="tc-head"><div class="tc-title"><i class="fas fa-trophy" style="color:var(--ac4)"></i> Meilleur Score Global</div></div>
+      <div class="tc-head"><div class="tc-title"><i class="fas fa-trophy" style="color:var(--gold)"></i> Meilleur Score Global</div></div>
       <?php if(!empty($stats['top_score'])): ?>
       <div class="rlist">
         <?php foreach($stats['top_score'] as $i => $m): ?>
@@ -548,13 +471,13 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
           <div class="ri-info">
             <div class="ri-name"><?php echo htmlspecialchars($m['nom']??'N/A'); ?></div>
             <div class="ri-sub"><?php echo htmlspecialchars($m['categorie']??'—'); ?></div>
-            <?php echo score_bar((float)($m['score_global']??0), 10, '--ac1'); ?>
+            <?php echo score_bar((float)($m['score_global']??0), 10); ?>
           </div>
-          <div class="ri-val" style="color:var(--ac1)"><?php echo number_format($m['score_global']??0,1); ?>/10</div>
+          <div class="ri-val" style="color:var(--gold)"><?php echo number_format($m['score_global']??0,1); ?>/10</div>
         </div>
         <?php endforeach; ?>
       </div>
-      <?php else: ?><div class="nodata"><i class="fas fa-trophy"></i>Aucune donnée performance</div><?php endif; ?>
+      <?php else: ?><div class="nodata" style="padding:30px"><i class="fas fa-trophy"></i>Aucune donnée performance</div><?php endif; ?>
     </div>
 
     <!-- Top Rapidité -->
@@ -569,13 +492,13 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
           <div class="ri-info">
             <div class="ri-name"><?php echo htmlspecialchars($m['nom']??'N/A'); ?></div>
             <div class="ri-sub"><?php echo htmlspecialchars($m['categorie']??'—'); ?></div>
-            <?php echo score_bar((float)($m['rapidite']??0), 10, '--ac2'); ?>
+            <?php echo score_bar((float)($m['rapidite']??0), 10); ?>
           </div>
           <div class="ri-val" style="color:var(--ac2)"><?php echo number_format($m['rapidite']??0,1); ?>/10</div>
         </div>
         <?php endforeach; ?>
       </div>
-      <?php else: ?><div class="nodata"><i class="fas fa-rocket"></i>Aucune donnée</div><?php endif; ?>
+      <?php else: ?><div class="nodata" style="padding:30px"><i class="fas fa-rocket"></i>Aucune donnée</div><?php endif; ?>
     </div>
 
     <!-- Top Qualité -->
@@ -590,34 +513,13 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
           <div class="ri-info">
             <div class="ri-name"><?php echo htmlspecialchars($m['nom']??'N/A'); ?></div>
             <div class="ri-sub"><?php echo htmlspecialchars($m['categorie']??'—'); ?></div>
-            <?php echo score_bar((float)($m['qualite']??0), 10, '--ac5'); ?>
+            <?php echo score_bar((float)($m['qualite']??0), 10); ?>
           </div>
           <div class="ri-val" style="color:var(--ac5)"><?php echo number_format($m['qualite']??0,1); ?>/10</div>
         </div>
         <?php endforeach; ?>
       </div>
-      <?php else: ?><div class="nodata"><i class="fas fa-star"></i>Aucune donnée</div><?php endif; ?>
-    </div>
-
-    <!-- Top Global Rating -->
-    <div class="tc">
-      <div class="tc-head"><div class="tc-title"><i class="fas fa-medal" style="color:var(--ac3)"></i> Top Rating Global</div></div>
-      <?php if(!empty($stats['top_rating'])): ?>
-      <div class="rlist">
-        <?php foreach($stats['top_rating'] as $i => $m): ?>
-        <div class="ri">
-          <div class="ri-rank"><?php echo $i+1; ?></div>
-          <?php echo model_img($m['logo']??'', $m['nom']??'AI', '38px'); ?>
-          <div class="ri-info">
-            <div class="ri-name"><?php echo htmlspecialchars($m['nom']??'N/A'); ?></div>
-            <div class="ri-sub"><?php echo htmlspecialchars($m['categorie']??'—'); ?></div>
-            <?php echo score_bar((float)($m['global_rating']??0), 5, '--ac3'); ?>
-          </div>
-          <div class="ri-val" style="color:var(--ac3)"><?php echo number_format($m['global_rating']??0,2); ?>/5</div>
-        </div>
-        <?php endforeach; ?>
-      </div>
-      <?php else: ?><div class="nodata"><i class="fas fa-medal"></i>Aucune donnée</div><?php endif; ?>
+      <?php else: ?><div class="nodata" style="padding:30px"><i class="fas fa-star"></i>Aucune donnée</div><?php endif; ?>
     </div>
 
     <!-- Top Reviews -->
@@ -637,104 +539,9 @@ function score_bar(float $v, float $max=10, string $color='--ac1'): string {
         </div>
         <?php endforeach; ?>
       </div>
-      <?php else: ?><div class="nodata"><i class="fas fa-comment"></i>Aucun avis</div><?php endif; ?>
+      <?php else: ?><div class="nodata" style="padding:30px"><i class="fas fa-comment"></i>Aucun avis</div><?php endif; ?>
     </div>
 
-    <!-- Contributions utilisateurs -->
-    <div class="tc">
-      <div class="tc-head"><div class="tc-title"><i class="fas fa-user-pen" style="color:var(--ac5)"></i> Contributions Utilisateurs</div></div>
-      <?php if(!empty($stats['models_by_user'])):
-        $max_contrib = max(array_column($stats['models_by_user'], 'count') ?: [1]);
-      ?>
-      <div>
-        <?php foreach($stats['models_by_user'] as $u):
-          $initials = implode('', array_map(fn($w)=>strtoupper($w[0]), array_slice(explode(' ', $u['nom']??'?'),0,2)));
-          $pct = $max_contrib > 0 ? round(($u['count']/$max_contrib)*100) : 0;
-          $role_badge = match($u['role']??'') {
-            'admin'    => '<span class="badge r">admin</span>',
-            'adherent' => '<span class="badge b">adhérent</span>',
-            default    => '<span class="badge" style="background:rgba(255,255,255,.06);color:var(--muted)">visiteur</span>'
-          };
-        ?>
-        <div class="user-row">
-          <div class="user-avatar"><?php echo $initials; ?></div>
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-              <span class="user-name"><?php echo htmlspecialchars($u['nom']??''); ?></span>
-              <?php echo $role_badge; ?>
-            </div>
-            <div class="pbar">
-              <div class="pbar-track"><div class="pbar-fill" style="width:<?php echo $pct; ?>%"></div></div>
-              <span><?php echo (int)$u['count']; ?></span>
-            </div>
-          </div>
-        </div>
-        <?php endforeach; ?>
-      </div>
-      <?php else: ?><div class="nodata"><i class="fas fa-user"></i>Aucune donnée</div><?php endif; ?>
-    </div>
-
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     STATISTIQUES GLOBALES
-═══════════════════════════════════════════════════════════ -->
-<div class="sec" data-reveal>
-  <div class="sec-title">
-    <div class="dot" style="background:var(--ac2)"></div>
-    <h2>Statistiques Globales</h2>
-  </div>
-  <div class="cc">
-    <div class="gstat-grid">
-      <div class="gstat">
-        <div class="gstat-lbl">Rapidité Moyenne</div>
-        <div class="gstat-val" style="color:var(--ac1)"><?php echo number_format($stats['perf_avg']['rapidite'],1); ?><small>/10</small></div>
-        <div class="stars">
-          <?php $r=(float)$stats['perf_avg']['rapidite'];
-          for($i=1;$i<=5;$i++){
-            if($i<=$r/2) echo '<i class="fas fa-star"></i>';
-            elseif($i-0.5<=$r/2) echo '<i class="fas fa-star-half-alt"></i>';
-            else echo '<i class="far fa-star"></i>';
-          } ?>
-        </div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Qualité Moyenne</div>
-        <div class="gstat-val" style="color:var(--ac5)"><?php echo number_format($stats['perf_avg']['qualite'],1); ?><small>/10</small></div>
-        <div class="gstat-sub">score de qualité moyen</div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Crédibilité Moyenne</div>
-        <div class="gstat-val" style="color:var(--ac6)"><?php echo number_format($stats['perf_avg']['credibilite'],1); ?><small>/10</small></div>
-        <div class="gstat-sub">indice de fiabilité</div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Score Global Moyen</div>
-        <div class="gstat-val" style="color:var(--ac3)"><?php echo number_format($stats['perf_avg']['score_global'],1); ?><small>/10</small></div>
-        <div class="gstat-sub">performance globale</div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Prix Moyen (Payants)</div>
-        <div class="gstat-val" style="color:var(--ac4)"><?php echo number_format($stats['global']['avg_price_paid'],2); ?><small> €</small></div>
-        <div class="gstat-sub">par plan payant</div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Prix Minimum</div>
-        <div class="gstat-val" style="color:var(--ac3)"><?php echo number_format($stats['global']['min_price'],2); ?><small> €</small></div>
-        <div class="gstat-sub">plan le moins cher</div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Prix Maximum</div>
-        <div class="gstat-val" style="color:var(--ac2)"><?php echo number_format($stats['global']['max_price'],2); ?><small> €</small></div>
-        <div class="gstat-sub">plan le plus cher</div>
-      </div>
-      <div class="gstat">
-        <div class="gstat-lbl">Utilisateurs Total</div>
-        <div class="gstat-val" style="color:var(--ac5)"><?php echo $stats['total_users']; ?></div>
-        <div class="gstat-sub"><?php echo $stats['total_admins']; ?> admins · <?php echo $stats['total_adherents']; ?> adhérents</div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -747,34 +554,29 @@ const D = {
   perfCatL:     <?php echo $json['perf_cat_labels']; ?>,
   perfCatS:     <?php echo $json['perf_cat_scores']; ?>,
   perfCatR:     <?php echo $json['perf_cat_rapid']; ?>,
-  periodeL:     <?php echo $json['periode_labels']; ?>,
-  periodeC:     <?php echo $json['periode_counts']; ?>,
-  pricePL:      <?php echo $json['price_per_labels']; ?>,
-  pricePV:      <?php echo $json['price_per_values']; ?>,
   userL:        <?php echo $json['user_labels']; ?>,
   userC:        <?php echo $json['user_counts']; ?>,
-  statusL:      <?php echo $json['status_labels']; ?>,
-  statusC:      <?php echo $json['status_counts']; ?>,
   free:         <?php echo (int)$stats['pricing']['free']; ?>,
   paid:         <?php echo (int)$stats['pricing']['paid']; ?>,
 };
 
-const PAL = ['#4d9de0','#3ecf8e','#e15f41','#f7b731','#9b59b6','#1abc9c','#e74c3c','#2ecc71'];
+// Palette navy-or pour thème clair
+const PAL = ['#1B2A4A','#263d6b','#4d78b8','#b8940a','#e8a44a','#0d7a55','#7c3aed','#c97fd4'];
 
-Chart.defaults.color       = '#6b7b96';
-Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+Chart.defaults.color       = '#6b7a94';
+Chart.defaults.borderColor = 'rgba(27,42,74,.08)';
 Chart.defaults.font.family = "'DM Sans', sans-serif";
 Chart.defaults.font.size   = 12;
 
 const defaults = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false,
-  plugins:{ legend:{ position:'bottom', labels:{ padding:14, usePointStyle:true, pointStyle:'circle', boxWidth:8 } } }
+  plugins:{ legend:{ position:'bottom', labels:{ padding:14, usePointStyle:true, pointStyle:'circle', boxWidth:8, color:'#a0b0c8' } } }
 }, extra);
 
 function dlChart(id){ const c=document.getElementById(id); if(!c)return; const a=document.createElement('a'); a.download=id+'.png'; a.href=c.toDataURL('image/png',1); a.click(); }
 function mkPie(id, labels, data, opts={}){
   const el=document.getElementById(id); if(!el||!labels.length) return;
-  return new Chart(el,{type:'doughnut', data:{labels, datasets:[{data, backgroundColor:PAL, borderColor:'#121826', borderWidth:3, hoverBorderWidth:0, hoverOffset:6}]}, options:defaults(opts)});
+  return new Chart(el,{type:'doughnut', data:{labels, datasets:[{data, backgroundColor:PAL, borderColor:'#fffdf5', borderWidth:3, hoverBorderWidth:0, hoverOffset:6}]}, options:defaults(opts)});
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -782,54 +584,53 @@ document.addEventListener('DOMContentLoaded',()=>{
   // 1. Outils par Catégorie
   if(D.cats.length) mkPie('catChart', D.cats, D.catC);
 
-  // 2. Gratuits vs Payants (plans tarif)
+  // 2. Gratuits vs Payants
   if(D.free+D.paid>0) new Chart(document.getElementById('priceDoughnut'),{type:'doughnut',
-    data:{labels:['Gratuits','Payants'],datasets:[{data:[D.free,D.paid],backgroundColor:['#3ecf8e','#e15f41'],borderColor:'#121826',borderWidth:3,hoverOffset:6}]},
+    data:{labels:['Gratuits','Payants'],datasets:[{data:[D.free,D.paid],backgroundColor:['#0d7a55','#b8940a'],borderColor:'#fffdf5',borderWidth:3,hoverOffset:6}]},
     options:defaults({cutout:'68%'})
   });
 
-  // 3. Statut des outils
-  if(D.statusL.length){
-    const colors = D.statusL.map(s => s==='actif'?'#3ecf8e': s==='en_attente'?'#f7b731':'#e15f41');
-    new Chart(document.getElementById('statusChart'),{type:'doughnut',
-      data:{labels:D.statusL, datasets:[{data:D.statusC, backgroundColor:colors, borderColor:'#121826', borderWidth:3, hoverOffset:6}]},
-      options:defaults({cutout:'60%'})
-    });
-  }
-
-  // 4. Score Global par Catégorie
+  // 3. Score Global par Catégorie
   if(D.perfCatL.length) new Chart(document.getElementById('perfCatChart'),{type:'bar',
-    data:{labels:D.perfCatL, datasets:[{label:'Score Global',data:D.perfCatS, backgroundColor:PAL, borderRadius:8, borderWidth:0}]},
-    options:defaults({plugins:{legend:{display:false}}, scales:{y:{min:0,max:10,grid:{color:'rgba(255,255,255,.04)'}}, x:{grid:{display:false}}}})
+    data:{labels:D.perfCatL, datasets:[{label:'Score Global',data:D.perfCatS,
+      backgroundColor: D.perfCatS.map((_,i) => PAL[i % PAL.length]),
+      borderRadius:8, borderWidth:0}]},
+    options:defaults({plugins:{legend:{display:false}}, scales:{
+      y:{min:0,max:10,grid:{color:'rgba(27,42,74,.06)'}, ticks:{color:'#6b7a94'}},
+      x:{grid:{display:false}, ticks:{color:'#6b7a94'}}
+    }})
   });
 
-  // 5. Plans par Période
-  if(D.periodeL.length) mkPie('periodeChart', D.periodeL, D.periodeC);
-
-  // 6. Prix moyen par période
-  if(D.pricePL.length) new Chart(document.getElementById('pricePeriodeChart'),{type:'bar',
-    data:{labels:D.pricePL, datasets:[{data:D.pricePV, backgroundColor:D.pricePL.map((_,i)=>PAL[i%PAL.length]), borderRadius:8, borderWidth:0}]},
-    options:defaults({indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, title:{display:true,text:'€'}, grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{display:false}}}})
-  });
-
-  // 7. Rapidité Moy. par catégorie
+  // 4. Rapidité Moy. par catégorie
   if(D.perfCatL.length) new Chart(document.getElementById('rapCatChart'),{type:'line',
-    data:{labels:D.perfCatL, datasets:[{data:D.perfCatR, borderColor:'#e15f41', backgroundColor:'rgba(225,95,65,.1)', pointBackgroundColor:'#e15f41', pointBorderColor:'#121826', pointBorderWidth:2, pointRadius:5, tension:.4, fill:true, borderWidth:2.5}]},
-    options:defaults({plugins:{legend:{display:false}}, scales:{y:{min:0,max:10, title:{display:true,text:'Rapidité /10'}, grid:{color:'rgba(255,255,255,.04)'}}, x:{grid:{display:false}}}})
+    data:{labels:D.perfCatL, datasets:[{data:D.perfCatR,
+      borderColor:'#1B2A4A',
+      backgroundColor:'rgba(27,42,74,.07)',
+      pointBackgroundColor:'#F3E5AB',
+      pointBorderColor:'#1B2A4A',
+      pointBorderWidth:2, pointRadius:5,
+      tension:.4, fill:true, borderWidth:2.5}]},
+    options:defaults({plugins:{legend:{display:false}},
+      scales:{
+        y:{min:0,max:10, title:{display:true,text:'Rapidité /10',color:'#6b7a94'}, grid:{color:'rgba(27,42,74,.06)'}, ticks:{color:'#6b7a94'}},
+        x:{grid:{display:false}, ticks:{color:'#6b7a94'}}
+      }
+    })
   });
 
-  // 8. Contributions utilisateurs
+  // 6. Contributions utilisateurs
   if(D.userL.length) new Chart(document.getElementById('userChart'),{type:'bar',
-    data:{labels:D.userL, datasets:[{data:D.userC, backgroundColor:'rgba(155,89,182,.6)', borderColor:'#9b59b6', borderRadius:8, borderWidth:0}]},
-    options:defaults({indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}, grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{display:false}}}})
-  });
-
-  // ── Compteurs KPI ──
-  document.querySelectorAll('.kpi-num[data-target]').forEach(el=>{
-    const target=parseInt(el.dataset.target,10)||0;
-    if(!target){el.textContent='0';return;}
-    let cur=0; const step=Math.max(1,Math.ceil(target/50));
-    const t=setInterval(()=>{ cur=Math.min(cur+step,target); el.textContent=cur; if(cur>=target)clearInterval(t); },18);
+    data:{labels:D.userL, datasets:[{data:D.userC,
+      backgroundColor:'rgba(27,42,74,.15)',
+      borderColor:'#1B2A4A',
+      borderWidth:1.5,
+      borderRadius:8}]},
+    options:defaults({indexAxis:'y', plugins:{legend:{display:false}},
+      scales:{
+        x:{beginAtZero:true,ticks:{stepSize:1,color:'#6b7a94'}, grid:{color:'rgba(27,42,74,.06)'}},
+        y:{grid:{display:false}, ticks:{color:'#6b7a94'}}
+      }
+    })
   });
 
   // ── Progress bars animation ──
