@@ -5,15 +5,14 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 $host = 'localhost';
 $dbname = 'prj_ai';
-// $dbname = 'projet_ia';
-$port = 3307;
+// $port = 3307;
 
 $username = 'root';
-$password = '';
+$password = 'root';
 
 try {
     $pdo = new PDO(
-        "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8",
+        "mysql:host=$host;dbname=$dbname;charset=utf8",
 
         $username,
         $password,
