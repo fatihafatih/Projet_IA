@@ -2,7 +2,6 @@
 require_once '../../includes/auth_admin.php'; // Sécurité : admin uniquement
 
 header('Content-Type: application/json');
-
 // Lire le body JSON envoyé par le JS
 $input = json_decode(file_get_contents('php://input'), true);
 if (!$input) {

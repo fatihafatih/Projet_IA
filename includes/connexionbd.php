@@ -8,7 +8,7 @@ $dbname = 'prj_ai';
 // $port = 3307;
 
 $username = 'root';
-$password = 'root';
+$password = '';
 
 try {
     $pdo = new PDO(
