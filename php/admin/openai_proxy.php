@@ -2,7 +2,6 @@
 require_once '../../includes/auth_admin.php';
 
 header('Content-Type: application/json');
-
 $input = json_decode(file_get_contents('php://input'), true);
 if (!$input) {
     http_response_code(400);

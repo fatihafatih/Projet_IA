@@ -1,3 +1,224 @@
+<style>
+
+  
+:root {
+  --primary: #4A6BB0;
+  --primary-dark: #39558f;
+
+  --accent: #F3E5AB;
+
+  --adm-bg: #FAF8F5;
+  --adm-surface: #FFFFFF;
+
+  --adm-text: #1B2A4A;
+  --adm-muted: #667085;
+
+  --adm-border: #E5E7EB;
+
+  --adm-red: #DC2626;
+  --adm-green: #16A34A;
+  --adm-orange: #D97706;
+  --adm-blue: #2563EB;
+
+  --adm-radius: 14px;
+  --adm-shadow: 0 4px 24px rgba(27, 42, 74, 0.08);
+
+  --adm-sidebar-bg: #1B2A4A;
+  --adm-sidebar-hover: rgba(255,255,255,0.08);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.adm-body {
+  margin: 0;
+  display: flex;
+  min-height: 100vh;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--adm-bg);
+  color: var(--adm-text);
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.adm-sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background: var(--adm-sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 50;
+  padding: 0 0 24px;
+  box-shadow: 4px 0 18px rgba(0,0,0,0.04);
+}
+
+.adm-logo {
+  padding: 26px 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.adm-logo span {
+  font-family: 'Nunito', sans-serif;
+  font-size: 19px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.adm-logo em {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+  margin-left: 2px;
+}
+
+.adm-nav {
+  padding: 18px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.adm-nav-lbl {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  padding: 14px 12px 8px;
+}
+
+.adm-nav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  color: rgba(255,255,255,0.75);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all .2s ease;
+  position: relative;
+}
+
+.adm-nav a svg {
+  flex-shrink: 0;
+  opacity: .8;
+}
+
+.adm-nav a:hover {
+  background: var(--adm-sidebar-hover);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.adm-nav a.active {
+  background: var(--accent);
+  color: var(--adm-text);
+  box-shadow: 0 6px 14px rgba(243,229,171,0.25);
+}
+
+.adm-nav a.active svg {
+  opacity: 1;
+}
+
+.adm-badge {
+  margin-left: auto;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: 'Nunito', sans-serif;
+}
+
+.adm-nav a.active .adm-badge {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ── Footer sidebar (user info) ── */
+.adm-foot {
+  margin-top: auto;
+  padding: 16px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.adm-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.adm-av {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--adm-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-family: 'Nunito', sans-serif;
+  flex-shrink: 0;
+}
+
+.adm-uname {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-urole {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+}
+
+.adm-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  transition: .2s ease;
+}
+
+.adm-logout:hover {
+  background: var(--accent);
+  color: var(--adm-text);
+  border-color: var(--accent);
+}
+
+</style>
 <?php $cur = basename($_SERVER['PHP_SELF']); ?>
 <aside class="adm-sidebar">
   <div class="adm-logo">

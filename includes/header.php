@@ -249,10 +249,10 @@ function isActive(string $page): string {
             AI Tools
         </a>
 
-        <a href="../php/pricing.php"
+        <!-- <a href="../php/pricing.php"
            class="nav-link <?= isActive('pricing') ?>">
             Tarifs
-        </a>
+        </a> -->
 
         <!-- Séparateur visuel -->
         <span class="nav-sep" aria-hidden="true"></span>
@@ -278,10 +278,10 @@ function isActive(string $page): string {
             À propos
         </a>
 
-        <a href="../php/contact.php"
+        <!-- <a href="../php/contact.php"
            class="nav-link <?= isActive('contact') ?>">
             Contact
-        </a>
+        </a> -->
 
     </nav>
 

@@ -84,71 +84,303 @@ $notifs   = $pdo->query(
 <link rel="stylesheet" href="../../styles/style.css">
 <link rel="stylesheet" href="../../styles/admin.css">
 <style>
+/* ============================================================
+   NOTIFICATIONS.CSS — Styles spécifiques à la page notifications.php
+   À charger après admin.css
+   ============================================================ */
+
+/* ── Bouton secondaire (header) ── */
+.btn-adm-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: 1px solid var(--adm-border);
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  transition: .2s ease;
+}
+
+.btn-adm-secondary:hover {
+  background: var(--adm-bg);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ── Alertes ── */
+.adm-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+
+.adm-alert-success {
+  background: #F0FDF4;
+  color: var(--adm-green);
+  border-color: #BBF7D0;
+}
+
+.adm-alert-warning {
+  background: #FFFBEB;
+  color: var(--adm-orange);
+  border-color: #FDE68A;
+}
+
+.adm-alert-danger {
+  background: #FEF2F2;
+  color: var(--adm-red);
+  border-color: #FECACA;
+}
+
 /* ── Tabs ── */
-.notif-tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--adm-border,#e2e8f0);padding-bottom:0}
-.notif-tab{padding:8px 18px;font-size:.85rem;font-weight:600;cursor:pointer;border:none;background:none;
-           color:var(--adm-muted,#64748b);border-bottom:2px solid transparent;margin-bottom:-2px;
-           transition:color .15s,border-color .15s}
-.notif-tab.active{color:var(--adm-blue,#3b82f6);border-bottom-color:var(--adm-blue,#3b82f6)}
-.notif-tab:hover{color:var(--adm-text,#1e293b)}
+.notif-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--adm-border);
+  padding-bottom: 0;
+}
+
+.notif-tab {
+  padding: 8px 18px;
+  font-size: .85rem;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--adm-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.notif-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.notif-tab:hover {
+  color: var(--adm-text);
+}
+
+/* ── Badge compteur dans les tabs ── */
+.adm-badge {
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: 'Nunito', sans-serif;
+}
+
+/* ── Note info (bandeau) ── */
+.notif-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1E40AF;
+  margin-bottom: 18px;
+}
+
+.notif-note svg {
+  flex-shrink: 0;
+}
 
 /* ── Carte outil en attente ── */
-.pending-card{display:flex;align-items:center;gap:14px;padding:14px 16px;
-              border:1px solid var(--adm-border,#e2e8f0);border-radius:12px;
-              background:var(--adm-surface,#fff);margin-bottom:10px;
-              transition:box-shadow .15s}
-.pending-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.06)}
-.pending-thumb{width:44px;height:44px;object-fit:contain;border-radius:8px;
-               border:1px solid var(--adm-border,#e2e8f0);background:#f8fafc;
-               padding:3px;flex-shrink:0}
-.pending-thumb-ph{width:44px;height:44px;border-radius:8px;background:var(--adm-hover,#f1f5f9);
-                  display:flex;align-items:center;justify-content:center;
-                  color:var(--adm-muted);font-size:1.2rem;flex-shrink:0}
-.pending-info{flex:1;min-width:0}
-.pending-name{font-weight:700;font-size:.9rem;margin-bottom:2px}
-.pending-meta{font-size:.75rem;color:var(--adm-muted)}
-.pending-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.pending-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--adm-border);
+  border-radius: 12px;
+  background: var(--adm-surface);
+  margin-bottom: 10px;
+  transition: box-shadow .15s;
+}
+
+.pending-card:hover {
+  box-shadow: var(--adm-shadow);
+}
+
+.pending-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--adm-border);
+  background: #F8FAFC;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.pending-thumb-ph {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--adm-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--adm-muted);
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.pending-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pending-name {
+  font-weight: 700;
+  font-size: .9rem;
+  margin-bottom: 2px;
+}
+
+.pending-meta {
+  font-size: .75rem;
+  color: var(--adm-muted);
+}
+
+.pending-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+}
 
 /* ── Bouton Vérifier IA ── */
-.btn-verify-ia{
-    display:inline-flex;align-items:center;gap:5px;
-    padding:7px 14px;
-    background:linear-gradient(135deg,#10b981,#059669);
-    color:#fff!important;border-radius:8px;
-    font-size:.78rem;font-weight:700;
-    text-decoration:none;white-space:nowrap;
-    transition:opacity .15s,transform .1s;
+.btn-verify-ia {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: #fff !important;
+  border-radius: 8px;
+  font-size: .78rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity .15s, transform .1s;
 }
-.btn-verify-ia:hover{opacity:.88;transform:translateY(-1px)}
+
+.btn-verify-ia:hover {
+  opacity: .88;
+  transform: translateY(-1px);
+}
 
 /* ── Ligne notification ── */
-.notif-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
-           border-radius:10px;margin-bottom:6px;
-           border:1px solid var(--adm-border,#e2e8f0);
-           background:var(--adm-surface,#fff);transition:background .15s}
-.notif-row.unread{background:var(--adm-blue-light,#eff6ff);border-color:#bfdbfe}
-.notif-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
-.nd-info{background:#3b82f6}.nd-alerte{background:#f59e0b}
-.nd-promotion{background:#8b5cf6}.nd-systeme{background:#6b7280}
-.notif-body{flex:1;min-width:0}
-.notif-title{font-size:.85rem;font-weight:600;margin-bottom:2px}
-.notif-msg{font-size:.78rem;color:var(--adm-muted);margin-bottom:4px}
-.notif-footer{font-size:.7rem;color:var(--adm-muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.notif-badge{font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:12px;
-             text-transform:uppercase;letter-spacing:.03em}
-.nb-info{background:#dbeafe;color:#1e40af}.nb-alerte{background:#fef3c7;color:#92400e}
-.nb-promotion{background:#ede9fe;color:#5b21b6}.nb-systeme{background:#f1f5f9;color:#475569}
+.notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+  transition: background .15s;
+}
+
+.notif-row.unread {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+}
+
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.nd-info { background: #3B82F6; }
+.nd-alerte { background: #F59E0B; }
+.nd-promotion { background: #8B5CF6; }
+.nd-systeme { background: #6B7280; }
+
+.notif-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-title {
+  font-size: .85rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: var(--adm-text);
+}
+
+.notif-msg {
+  font-size: .78rem;
+  color: var(--adm-muted);
+  margin-bottom: 4px;
+}
+
+.notif-footer {
+  font-size: .7rem;
+  color: var(--adm-muted);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.notif-badge {
+  font-size: .65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.nb-info { background: #DBEAFE; color: #1E40AF; }
+.nb-alerte { background: #FEF3C7; color: #92400E; }
+.nb-promotion { background: #EDE9FE; color: #5B21B6; }
+.nb-systeme { background: #F1F5F9; color: #475569; }
 
 /* ── Empty state ── */
-.empty-state{text-align:center;padding:48px 20px;color:var(--adm-muted)}
-.empty-state svg{margin-bottom:10px;opacity:.35}
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--adm-muted);
+}
 
-/* ── Note info ── */
-.notif-note{display:flex;align-items:center;gap:6px;padding:10px 14px;
-            background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
-            font-size:.8rem;color:#1e40af;margin-bottom:16px}
+.empty-state svg {
+  margin-bottom: 10px;
+  opacity: .35;
+}
 
-.hidden{display:none!important}
+.empty-state p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.hidden {
+  display: none !important;
+}
 </style>
 </head>
 <body class="adm-body">

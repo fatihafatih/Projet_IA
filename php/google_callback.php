@@ -3,7 +3,6 @@ session_start();
  require '../includes/connexionbd.php';
 
 
-
 // Vérification sécurité
 if (!isset($_GET['state']) || $_GET['state'] !== $_SESSION['oauth_state']) {
     header('Location:/PROJET_IA/php/dashboard.php?error=state');

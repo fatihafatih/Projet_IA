@@ -196,7 +196,19 @@ body {
     background-attachment: fixed;
     position: relative;
 }
-
+.topbar {
+    background: var(--dark);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 1px 12px rgba(0,0,0,0.05);
+}
 /* Un petit effet de lueur subtile en haut de l'écran */
 body::before {
     content: "";

@@ -115,6 +115,506 @@ $counts = [
         rel="stylesheet">
     <link rel="stylesheet" href="../../styles/style.css">
     <link rel="stylesheet" href="../../styles/admin.css">
+    <style>
+
+        /* ============================================================
+   USERS.CSS — Styles spécifiques à la page users.php
+   À charger après admin.css
+   ============================================================ */
+
+/* ── Bouton principal (header) ── */
+.btn-adm-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(74,107,176,0.25);
+  transition: .2s ease;
+}
+
+.btn-adm-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+/* ── Alertes ── */
+.adm-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+
+.adm-alert-success {
+  background: #F0FDF4;
+  color: var(--adm-green);
+  border-color: #BBF7D0;
+}
+
+.adm-alert-warning {
+  background: #FFFBEB;
+  color: var(--adm-orange);
+  border-color: #FDE68A;
+}
+
+.adm-alert-danger {
+  background: #FEF2F2;
+  color: var(--adm-red);
+  border-color: #FECACA;
+}
+
+/* ── Tabs de filtres (stabs) ── */
+.stabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.stab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none;
+  color: var(--adm-muted);
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  transition: .2s ease;
+}
+
+.stab:hover {
+  color: var(--adm-text);
+  border-color: var(--primary);
+}
+
+.stab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.stab-n {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+}
+
+.stab.active .stab-n {
+  background: rgba(255,255,255,0.25);
+}
+
+/* ── Barre de recherche ── */
+.adm-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  max-width: 480px;
+}
+
+.adm-search svg {
+  color: var(--adm-muted);
+  flex-shrink: 0;
+}
+
+.adm-search input[type="text"] {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--adm-text);
+}
+
+.adm-search input::placeholder {
+  color: var(--adm-muted);
+}
+
+.adm-search button {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: .2s ease;
+  white-space: nowrap;
+}
+
+.adm-search button:hover {
+  background: var(--primary-dark);
+}
+
+.adm-search a {
+  color: var(--adm-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.adm-search a:hover {
+  color: var(--adm-red);
+}
+
+/* ── Grille utilisateurs ── */
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.ucard {
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  padding: 18px;
+  transition: .2s ease;
+}
+
+.ucard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--adm-shadow);
+}
+
+.ucard-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ucard-av {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ucard-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--adm-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ucard-email {
+  font-size: 12px;
+  color: var(--adm-muted);
+  margin-top: 1px;
+  word-break: break-all;
+}
+
+.badge-self {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--adm-text);
+}
+
+.ucard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* ── Badge rôle ── */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  white-space: nowrap;
+}
+
+.role-badge.adherent {
+  background: #F0FDF4;
+  color: var(--adm-green);
+}
+
+.role-badge.admin {
+  background: #EFF4FF;
+  color: var(--adm-blue);
+}
+
+/* ── Actions carte utilisateur ── */
+.ucard-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-promote,
+.btn-demote,
+.btn-del-sm {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none;
+  transition: .2s ease;
+  white-space: nowrap;
+}
+
+.btn-promote {
+  background: #EFF4FF;
+  color: var(--primary);
+}
+
+.btn-promote:hover {
+  background: #DBEAFE;
+}
+
+.btn-demote {
+  background: #FFFBEB;
+  color: var(--adm-orange);
+}
+
+.btn-demote:hover {
+  background: #FEF3C7;
+}
+
+.btn-del-sm {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.btn-del-sm:hover {
+  background: #FEE2E2;
+}
+
+/* ── Pagination ── */
+.adm-pag {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.pag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none;
+  color: var(--adm-text);
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  transition: .2s ease;
+}
+
+.pag-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pag-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ── Modale Ajouter utilisateur ── */
+.adm-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(27, 42, 74, 0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.adm-modal-overlay.open {
+  display: flex;
+}
+
+.adm-modal {
+  background: var(--adm-surface);
+  border-radius: var(--adm-radius);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(27,42,74,0.25);
+  animation: admModalIn .2s ease;
+}
+
+@keyframes admModalIn {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.adm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.adm-modal-head h3 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--adm-text);
+  margin: 0;
+}
+
+.adm-modal-close {
+  border: none;
+  background: var(--adm-bg);
+  color: var(--adm-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.adm-modal-close:hover {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.adm-modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.adm-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--adm-border);
+}
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+  color: var(--adm-muted);
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--adm-bg);
+  color: var(--adm-text);
+}
+
+/* ── Champs de formulaire (modale ajout) ── */
+.adm-fg {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.adm-fg label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--adm-text);
+}
+
+.adm-fg input,
+.adm-fg select,
+.adm-fg textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--adm-text);
+  background: var(--adm-surface);
+  outline: none;
+  transition: .2s ease;
+}
+
+.adm-fg input:focus,
+.adm-fg select:focus,
+.adm-fg textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(74,107,176,0.12);
+}
+
+.adm-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .adm-row2 {
+    grid-template-columns: 1fr;
+  }
+}
+    </style>
 </head>
 
 <body class="adm-body">

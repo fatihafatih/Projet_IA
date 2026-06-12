@@ -102,19 +102,410 @@ $allCars    = $pdo->query("SELECT * FROM caracteristiques WHERE statut='actif' O
 <link rel="stylesheet" href="../../styles/style.css">
 <link rel="stylesheet" href="../../styles/admin.css">
 <style>
-.form-group{margin-bottom:16px}
-.form-label{display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--adm-text,#1e293b)}
-.form-control{width:100%;padding:8px 10px;border:1px solid var(--adm-border,#e2e8f0);border-radius:8px;font-size:.875rem;background:var(--adm-surface,#fff);color:var(--adm-text,#1e293b);box-sizing:border-box}
-.form-control:focus{outline:none;border-color:var(--adm-blue,#3b82f6)}
-.cars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:7px;max-height:180px;overflow-y:auto;padding:3px}
-.car-cb-label{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--adm-border,#e2e8f0);border-radius:7px;cursor:pointer;font-size:.8rem;transition:background .15s,border-color .15s}
-.car-cb-label:hover{background:var(--adm-hover,#f1f5f9);border-color:var(--adm-blue,#3b82f6)}
-.car-cb-label input{accent-color:var(--adm-blue,#3b82f6);width:14px;height:14px;flex-shrink:0}
-.badge-car{font-size:.63rem;font-weight:600;padding:2px 6px;border-radius:20px;background:#ecfdf5;color:#065f46;white-space:nowrap}
-.badge-status-actif{background:#dcfce7;color:#166534;font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:20px}
-.badge-status-inactif{background:#fee2e2;color:#991b1b;font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:20px}
-.badge-status-en_cours{background:#fef9c3;color:#854d0e;font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:20px}
-.badge-prov{font-size:.7rem;color:var(--adm-muted,#64748b);background:var(--adm-hover,#f1f5f9);padding:2px 7px;border-radius:12px}
+  /* ============================================================
+   MODELS.CSS — Styles spécifiques à la page models.php
+   À charger après admin.css
+   ============================================================ */
+
+/* ── Bouton principal (header) ── */
+.btn-adm-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(74,107,176,0.25);
+  transition: .2s ease;
+}
+
+.btn-adm-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+/* ── Alertes ── */
+.adm-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+
+.adm-alert-success {
+  background: #F0FDF4;
+  color: var(--adm-green);
+  border-color: #BBF7D0;
+}
+
+.adm-alert-warning {
+  background: #FFFBEB;
+  color: var(--adm-orange);
+  border-color: #FDE68A;
+}
+
+.adm-alert-danger {
+  background: #FEF2F2;
+  color: var(--adm-red);
+  border-color: #FECACA;
+}
+
+/* ── Barre de recherche ── */
+.adm-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  max-width: 480px;
+}
+
+.adm-search svg {
+  color: var(--adm-muted);
+  flex-shrink: 0;
+}
+
+.adm-search input[type="text"] {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--adm-text);
+}
+
+.adm-search input::placeholder {
+  color: var(--adm-muted);
+}
+
+.adm-search button {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: .2s ease;
+  white-space: nowrap;
+}
+
+.adm-search button:hover {
+  background: var(--primary-dark);
+}
+
+.adm-search a {
+  color: var(--adm-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.adm-search a:hover {
+  color: var(--adm-red);
+}
+
+/* ── Badges provider / catégorie / caractéristiques ── */
+.badge-prov {
+  font-size: .7rem;
+  color: var(--adm-muted);
+  background: var(--adm-bg);
+  padding: 2px 7px;
+  border-radius: 12px;
+}
+
+.badge-car {
+  font-size: .63rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 20px;
+  background: #ECFDF5;
+  color: #065F46;
+  white-space: nowrap;
+}
+
+/* ── Badges statut ── */
+.badge-status-actif {
+  background: #DCFCE7;
+  color: #166534;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+.badge-status-inactif {
+  background: #FEE2E2;
+  color: #991B1B;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+.badge-status-en_cours {
+  background: #FEF9C3;
+  color: #854D0E;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+/* ── Boutons d'action tableau ── */
+.btn-edt,
+.btn-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: .2s ease;
+}
+
+.btn-edt {
+  background: #EFF4FF;
+  color: var(--primary);
+}
+
+.btn-edt:hover {
+  background: #DBEAFE;
+  transform: translateY(-1px);
+}
+
+.btn-del {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.btn-del:hover {
+  background: #FEE2E2;
+  transform: translateY(-1px);
+}
+
+/* ── Pagination ── */
+.adm-pag {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.pag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none;
+  color: var(--adm-text);
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  transition: .2s ease;
+}
+
+.pag-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pag-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ── Modales ── */
+.adm-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(27, 42, 74, 0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.adm-modal-overlay.open {
+  display: flex;
+}
+
+.adm-modal {
+  background: var(--adm-surface);
+  border-radius: var(--adm-radius);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(27,42,74,0.25);
+  animation: admModalIn .2s ease;
+}
+
+@keyframes admModalIn {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.adm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.adm-modal-head h3 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--adm-text);
+  margin: 0;
+}
+
+.adm-modal-close {
+  border: none;
+  background: var(--adm-bg);
+  color: var(--adm-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.adm-modal-close:hover {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.adm-modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.adm-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--adm-border);
+}
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+  color: var(--adm-muted);
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--adm-bg);
+  color: var(--adm-text);
+}
+
+/* ── Champs de formulaire ── */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--adm-text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  font-size: .875rem;
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(74,107,176,0.12);
+}
+
+/* ── Grille de sélection des caractéristiques ── */
+.cars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 7px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 3px;
+}
+
+.car-cb-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid var(--adm-border);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: .8rem;
+  transition: background .15s, border-color .15s;
+}
+
+.car-cb-label:hover {
+  background: var(--adm-bg);
+  border-color: var(--primary);
+}
+
+.car-cb-label input {
+  accent-color: var(--primary);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
 </style>
 </head>
 <body class="adm-body">

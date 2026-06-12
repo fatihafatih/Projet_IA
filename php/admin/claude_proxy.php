@@ -11,7 +11,6 @@ if (!$input) {
 }
 
 // $apiKey = 'sk-ant-VOTRE_CLE_API_ICI'; // ← Mettez votre clé ici (ou via env var)
-
 $ch = curl_init('https://api.anthropic.com/v1/messages');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,

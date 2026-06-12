@@ -207,149 +207,545 @@ $allModels = $pdo->query(
   <title>Gestion Outils — Admin SearchIA</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="../../styles/style.css">
   <link rel="stylesheet" href="../../styles/admin.css">
   <style>
-    .t-thumb {
-      width: 38px;
-      height: 38px;
-      object-fit: contain;
-      border-radius: 8px;
-      border: 1px solid var(--adm-border, #e2e8f0);
-      background: #f8fafc;
-      padding: 3px;
-      flex-shrink: 0
-    }
+ /* ============================================================
+   OUTILS.CSS — Styles spécifiques à la page outils.php
+   À charger après admin.css
+   ============================================================ */
 
-    .tool-cell {
-      display: flex;
-      align-items: center;
-      gap: 10px
-    }
+/* ── Note notifications (bandeau info) ── */
+.notif-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f0fbec;
+  border: 1px solid #BFDBFE;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1eaf2c;
+  margin-bottom: 18px;
+}
 
-    .model-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px
-    }
+.notif-note svg {
+  flex-shrink: 0;
+}
 
-    .badge-model {
-      font-size: .65rem;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 20px;
-      background: var(--adm-badge-bg, #ede9fe);
-      color: var(--adm-badge-text, #5b21b6);
-      white-space: nowrap
-    }
+/* ── Tabs de filtres (stabs) ── */
+.stabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
 
-    .img-preview-wrap {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 6px
-    }
+.stab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none;
+  color: var(--adm-muted);
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  transition: .2s ease;
+}
 
-    .img-preview {
-      width: 56px;
-      height: 56px;
-      object-fit: contain;
-      border: 1px solid var(--adm-border, #e2e8f0);
-      border-radius: 10px;
-      background: #f8fafc;
-      padding: 4px;
-      display: none
-    }
+.stab:hover {
+  color: var(--adm-text);
+  border-color: var(--primary);
+}
 
-    .img-preview-placeholder {
-      width: 56px;
-      height: 56px;
-      border: 1.5px dashed var(--adm-border, #cbd5e1);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--adm-muted, #94a3b8);
-      font-size: .68rem;
-      text-align: center;
-      line-height: 1.3;
-      padding: 4px
-    }
+.stab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
 
-    .models-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 8px;
-      max-height: 220px;
-      overflow-y: auto;
-      padding: 4px 2px
-    }
+.stab-n {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+}
 
-    .model-cb-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 10px;
-      border: 1px solid var(--adm-border, #e2e8f0);
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .82rem;
-      transition: background .15s, border-color .15s;
-      line-height: 1.3
-    }
+.stab.active .stab-n {
+  background: rgba(255,255,255,0.25);
+}
 
-    .model-cb-label:hover {
-      background: var(--adm-hover, #f1f5f9);
-      border-color: var(--adm-blue, #3b82f6)
-    }
+/* ── Barre de recherche ── */
+.adm-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  max-width: 480px;
+}
 
-    .model-cb-label input[type="checkbox"] {
-      accent-color: var(--adm-blue, #3b82f6);
-      width: 15px;
-      height: 15px;
-      flex-shrink: 0
-    }
+.adm-search svg {
+  color: var(--adm-muted);
+  flex-shrink: 0;
+}
 
-    .model-provider-tag {
-      font-size: .68rem;
-      color: var(--adm-muted, #64748b);
-      display: block
-    }
+.adm-search input[type="text"] {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--adm-text);
+}
 
-    .form-group {
-      margin-bottom: 16px
-    }
+.adm-search input::placeholder {
+  color: var(--adm-muted);
+}
 
-    .form-label {
-      display: block;
-      font-size: .8rem;
-      font-weight: 600;
-      margin-bottom: 5px;
-      color: var(--adm-text, #1e293b)
-    }
+.adm-search button {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: .2s ease;
+  white-space: nowrap;
+}
 
-    .form-control {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid var(--adm-border, #e2e8f0);
-      border-radius: 8px;
-      font-size: .875rem;
-      background: var(--adm-surface, #fff);
-      color: var(--adm-text, #1e293b);
-      box-sizing: border-box
-    }
+.adm-search button:hover {
+  background: var(--primary-dark);
+}
 
-    .form-control:focus {
-      outline: none;
-      border-color: var(--adm-blue, #3b82f6)
-    }
+.adm-search a {
+  color: var(--adm-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 4px;
+}
 
-    .refusal-error {
-      margin-top: 8px;
-      color: #b91c1c;
-      font-size: .82rem;
-      line-height: 1.4
-    }
+.adm-search a:hover {
+  color: var(--adm-red);
+}
+
+/* ── Alertes ── */
+.adm-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+
+.adm-alert-success {
+  background: #F0FDF4;
+  color: var(--adm-green);
+  border-color: #BBF7D0;
+}
+
+.adm-alert-warning {
+  background: #FFFBEB;
+  color: var(--adm-orange);
+  border-color: #FDE68A;
+}
+
+.adm-alert-danger {
+  background: #FEF2F2;
+  color: var(--adm-red);
+  border-color: #FECACA;
+}
+
+/* ── Bouton principal (header) ── */
+.btn-adm-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(74,107,176,0.25);
+  transition: .2s ease;
+}
+
+.btn-adm-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+/* ── Cellule outil (logo + nom) ── */
+.tool-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.t-thumb {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--adm-border);
+  background: #F8FAFC;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+/* ── Badges modèles ── */
+.model-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.badge-model {
+  font-size: .65rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: #EDE9FE;
+  color: #5B21B6;
+  white-space: nowrap;
+}
+
+/* ── Statut pills ── */
+.st-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  white-space: nowrap;
+}
+
+.st-pill.actif {
+  background: #F0FDF4;
+  color: var(--adm-green);
+}
+
+.st-pill.en_attente {
+  background: #FFFBEB;
+  color: var(--adm-orange);
+}
+
+.st-pill.inactif {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+/* ── Boutons d'action tableau ── */
+.btn-edt,
+.btn-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: .2s ease;
+}
+
+.btn-edt {
+  background: #EFF4FF;
+  color: var(--primary);
+}
+
+.btn-edt:hover {
+  background: #DBEAFE;
+  transform: translateY(-1px);
+}
+
+.btn-del {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.btn-del:hover {
+  background: #FEE2E2;
+  transform: translateY(-1px);
+}
+
+/* ── Pagination ── */
+.adm-pag {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.pag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none;
+  color: var(--adm-text);
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  transition: .2s ease;
+}
+
+.pag-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pag-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ── Modales ── */
+.adm-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(27, 42, 74, 0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.adm-modal-overlay.open {
+  display: flex;
+}
+
+.adm-modal {
+  background: var(--adm-surface);
+  border-radius: var(--adm-radius);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(27,42,74,0.25);
+  animation: admModalIn .2s ease;
+}
+
+@keyframes admModalIn {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.adm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.adm-modal-head h3 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--adm-text);
+  margin: 0;
+}
+
+.adm-modal-close {
+  border: none;
+  background: var(--adm-bg);
+  color: var(--adm-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.adm-modal-close:hover {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.adm-modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.adm-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--adm-border);
+}
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+  color: var(--adm-muted);
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--adm-bg);
+  color: var(--adm-text);
+}
+
+/* ── Champs de formulaire (modales) ── */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--adm-text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  font-size: .875rem;
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(74,107,176,0.12);
+}
+
+/* ── Aperçu image (logo) ── */
+.img-preview-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.img-preview {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border: 1px solid var(--adm-border);
+  border-radius: 10px;
+  background: #F8FAFC;
+  padding: 4px;
+  display: none;
+}
+
+.img-preview-placeholder {
+  width: 56px;
+  height: 56px;
+  border: 1.5px dashed var(--adm-border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--adm-muted);
+  font-size: .68rem;
+  text-align: center;
+  line-height: 1.3;
+  padding: 4px;
+}
+
+/* ── Grille de sélection des modèles ── */
+.models-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.model-cb-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .82rem;
+  transition: background .15s, border-color .15s;
+  line-height: 1.3;
+}
+
+.model-cb-label:hover {
+  background: var(--adm-bg);
+  border-color: var(--primary);
+}
+
+.model-cb-label input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.model-provider-tag {
+  font-size: .68rem;
+  color: var(--adm-muted);
+  display: block;
+}
+
+/* ── Erreur motif de refus ── */
+.refusal-error {
+  margin-top: 8px;
+  color: var(--adm-red);
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.hidden {
+  display: none !important;
+}
   </style>
 </head>
 
