@@ -3,126 +3,69 @@ session_start();
 require_once '../includes/connexionbd.php';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-if (!$id) {
-  header('Location: dashboard.php');
-  exit;
-}
+if (!$id) { header('Location: dashboard.php'); exit; }
 
-// ── Soumission d'un avis ──────────────────────────────────────────────────────
 $review_error = '';
 $review_success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rating'])) {
   if (isset($_SESSION['user_id'])) {
-    $rating = isset($_POST['rating']) ? (int) $_POST['rating'] : 0;
+    $rating = (int) $_POST['rating'];
     $comment = trim($_POST['comment'] ?? '');
-
     if ($rating < 1 || $rating > 5) {
       $review_error = 'Veuillez sélectionner une note entre 1 et 5.';
     } else {
-      $ins = $pdo->prepare("
-                    INSERT INTO reviews (ID_OUTILS_IA, ID_USERS, rating, comment)
-                    VALUES (?, ?, ?, ?)
-                ");
+      $ins = $pdo->prepare("INSERT INTO reviews (ID_OUTILS_IA, ID_USERS, rating, comment) VALUES (?, ?, ?, ?)");
       $ins->execute([$id, $_SESSION['user_id'], $rating, $comment ?: null]);
-
-      // Recalcule la note globale
-      $pdo->prepare("
-                    UPDATE outils_ia
-                    SET global_rating = (
-                        SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?
-                    )
-                    WHERE ID_OUTILS_IA = ?
-                ")->execute([$id, $id]);
-
-      $review_success = 'Votre avis a bien été publié !';
-      header("Location: outil.php?id=$id#avis");
-      exit;
-
+      $pdo->prepare("UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?")->execute([$id, $id]);
+      header("Location: outil.php?id=$id#avis"); exit;
     }
   }
 }
 
-// ── Suppression d'un avis ─────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_review'])) {
   if (isset($_SESSION['user_id'])) {
     $review_id = (int) $_POST['delete_review'];
-    $pdo->prepare("
-      DELETE FROM reviews WHERE ID_REVIEW = ? AND ID_USERS = ?
-    ")->execute([$review_id, $_SESSION['user_id']]);
-
-    $pdo->prepare("
-      UPDATE outils_ia
-      SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?)
-      WHERE ID_OUTILS_IA = ?
-    ")->execute([$id, $id]);
-
-    header("Location: outil.php?id=$id#avis");
-    exit;
+    $pdo->prepare("DELETE FROM reviews WHERE ID_REVIEW = ? AND ID_USERS = ?")->execute([$review_id, $_SESSION['user_id']]);
+    $pdo->prepare("UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?")->execute([$id, $id]);
+    header("Location: outil.php?id=$id#avis"); exit;
   }
 }
 
-// ── Modification d'un avis ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_review'])) {
   if (isset($_SESSION['user_id'])) {
     $review_id = (int) $_POST['edit_review'];
     $rating_edit = (int) $_POST['rating_edit'];
     $comment_edit = trim($_POST['comment_edit'] ?? '');
-
     if ($rating_edit >= 1 && $rating_edit <= 5) {
-      $pdo->prepare("
-        UPDATE reviews SET rating = ?, comment = ?
-        WHERE ID_REVIEW = ? AND ID_USERS = ?
-      ")->execute([$rating_edit, $comment_edit ?: null, $review_id, $_SESSION['user_id']]);
-
-      $pdo->prepare("
-        UPDATE outils_ia
-        SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?)
-        WHERE ID_OUTILS_IA = ?
-      ")->execute([$id, $id]);
-
-      header("Location: outil.php?id=$id#avis");
-      exit;
+      $pdo->prepare("UPDATE reviews SET rating = ?, comment = ? WHERE ID_REVIEW = ? AND ID_USERS = ?")->execute([$rating_edit, $comment_edit ?: null, $review_id, $_SESSION['user_id']]);
+      $pdo->prepare("UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?")->execute([$id, $id]);
+      header("Location: outil.php?id=$id#avis"); exit;
     }
   }
 }
 
-// ── Outil principal ──────────────────────────────────────────────────────────
-$stmt = $pdo->prepare("
-    SELECT o.*, c.name AS categorie
-    FROM outils_ia o
-    LEFT JOIN categorie c ON o.ID_CATEGORIE = c.ID_CATEGORIE
-    WHERE o.ID_OUTILS_IA = ? AND o.status = 'actif'
-");
+$stmt = $pdo->prepare("SELECT o.*, c.name AS categorie FROM outils_ia o LEFT JOIN categorie c ON o.ID_CATEGORIE = c.ID_CATEGORIE WHERE o.ID_OUTILS_IA = ? AND o.status = 'actif'");
 $stmt->execute([$id]);
 $outil = $stmt->fetch();
-if (!$outil) {
-  header('Location: dashboard.php');
-  exit;
-}
+if (!$outil) { header('Location: dashboard.php'); exit; }
 
-// ── Performances ─────────────────────────────────────────────────────────────
-$stmt = $pdo->prepare("
-    SELECT AVG(rapidite) AS rapidite, AVG(qualite) AS qualite,
-           AVG(qualite_image) AS qualite_image, AVG(credibilite) AS credibilite,
-           AVG(score_global) AS score_global, COUNT(*) AS nb_evals
-    FROM performance WHERE ID_OUTILS_IA = ?
-");
+$stmt = $pdo->prepare("SELECT AVG(rapidite) AS rapidite, AVG(qualite) AS qualite, AVG(qualite_image) AS qualite_image, AVG(credibilite) AS credibilite, AVG(score_global) AS score_global, COUNT(*) AS nb_evals FROM performance WHERE ID_OUTILS_IA = ?");
 $stmt->execute([$id]);
 $perf = $stmt->fetch();
 
-// ── Avantages / Inconvénients ─────────────────────────────────────────────────
-$stmt = $pdo->prepare("
-    SELECT * FROM avantages_inconvenients WHERE ID_OUTILS_IA = ? ORDER BY type
-");
+$stmt = $pdo->prepare("SELECT * FROM avantages_inconvenients WHERE ID_OUTILS_IA = ? ORDER BY type");
 $stmt->execute([$id]);
 $ais = $stmt->fetchAll();
-$avantages = array_filter($ais, fn($r) => $r['type'] === 'avantage');
-$inconvenients = array_filter($ais, fn($r) => $r['type'] === 'inconvenient');
+$avantages    = array_filter($ais, fn($r) => $r['type'] === 'avantage');
+$inconvenients= array_filter($ais, fn($r) => $r['type'] === 'inconvenient');
+ $imagePath = !empty($_SESSION['image']) ? "/Projet_IA/php/uploads/avatars/" . htmlspecialchars($_SESSION['image']) : '';
 
-// ── Avis ──────────────────────────────────────────────────────────────────────
 $stmt = $pdo->prepare("
-    SELECT r.*, u.nom AS user_nom, u.image AS user_image
+    SELECT
+        r.*,
+        u.nom AS user_nom,
+        u.image AS user_image
     FROM reviews r
     JOIN users u ON r.ID_USERS = u.id
     WHERE r.ID_OUTILS_IA = ?
@@ -131,1532 +74,749 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $reviews = $stmt->fetchAll();
 
-// ── Modèles utilisés ──────────────────────────────────────────────────────────
-$stmt = $pdo->prepare("
-    SELECT m.*, p.name AS provider_name, p.logo_url AS provider_logo,
-           cat.name AS categorie
-    FROM tool_models tm
-    JOIN models m ON tm.ID_MODEL = m.ID_MODEL
-    LEFT JOIN providers p ON m.ID_PROVIDERS = p.ID_PROVIDERS
-    LEFT JOIN categorie cat ON m.ID_CATEGORIE = cat.ID_CATEGORIE
-    WHERE tm.ID_OUTILS_IA = ? AND m.status='actif'
-");
+$stmt = $pdo->prepare("SELECT m.*, p.name AS provider_name, p.logo_url AS provider_logo, cat.name AS categorie FROM tool_models tm JOIN models m ON tm.ID_MODEL = m.ID_MODEL LEFT JOIN providers p ON m.ID_PROVIDERS = p.ID_PROVIDERS LEFT JOIN categorie cat ON m.ID_CATEGORIE = cat.ID_CATEGORIE WHERE tm.ID_OUTILS_IA = ? AND m.status='actif'");
 $stmt->execute([$id]);
 $modeles = $stmt->fetchAll();
 
-// ── Caractéristiques ──────────────────────────────────────────────────────────
-$stmt = $pdo->prepare("
-    SELECT car.name, car.description
-    FROM model_caracteristiques mc
-    JOIN caracteristiques car ON mc.ID_CAR = car.ID_CAR
-    JOIN tool_models tm ON mc.ID_MODEL = tm.ID_MODEL
-    WHERE tm.ID_OUTILS_IA = ?
-    GROUP BY car.ID_CAR
-");
+$stmt = $pdo->prepare("SELECT car.name, car.description FROM model_caracteristiques mc JOIN caracteristiques car ON mc.ID_CAR = car.ID_CAR JOIN tool_models tm ON mc.ID_MODEL = tm.ID_MODEL WHERE tm.ID_OUTILS_IA = ? GROUP BY car.ID_CAR");
 $stmt->execute([$id]);
 $cars = $stmt->fetchAll();
 
-// ── Disponibilités ────────────────────────────────────────────────────────────
-$stmt = $pdo->prepare("
-    SELECT d.url, ta.name AS type_name
-    FROM tool_caracteristiques tc
-    JOIN disponibilite d ON tc.ID_DIS = d.ID_DIS
-    LEFT JOIN type_application ta ON d.ID_TA = ta.ID_TA
-    JOIN models m ON tc.ID_MODEL = m.ID_MODEL
-    JOIN tool_models tm ON m.ID_MODEL = tm.ID_MODEL
-    WHERE tm.ID_OUTILS_IA = ?
-    GROUP BY d.ID_DIS
-");
+$stmt = $pdo->prepare("SELECT d.url, ta.name AS type_name FROM tool_caracteristiques tc JOIN disponibilite d ON tc.ID_DIS = d.ID_DIS LEFT JOIN type_application ta ON d.ID_TA = ta.ID_TA JOIN models m ON tc.ID_MODEL = m.ID_MODEL JOIN tool_models tm ON m.ID_MODEL = tm.ID_MODEL WHERE tm.ID_OUTILS_IA = ? GROUP BY d.ID_DIS");
 $stmt->execute([$id]);
 $dispos = $stmt->fetchAll();
 
-// ── Note moyenne des reviews ───────────────────────────────────────────────────
-$avg_review = count($reviews)
-  ? round(array_sum(array_column($reviews, 'rating')) / count($reviews), 1)
-  : null;
-
-
-
+$avg_review = count($reviews) ? round(array_sum(array_column($reviews, 'rating')) / count($reviews), 1) : null;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($outil['nom']) ?> — Référentiel IA</title>
-  <!-- <link rel="stylesheet" href="../styles/outil.css"> -->
-  <link rel="stylesheet" href="../styles/favoris.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../styles/favoris.css">
   <style>
-    /* ════════════════════════════════════════════════════════════════════════════
-   REFERENTIEL IA - NAVY & BUTTER PREMIUM INTERFACE (LUXURY TECH)
-   ════════════════════════════════════════════════════════════════════════════ */
-
-    :root {
-      --bg-main: #0B111E;
-      /* Fond ultra-sombre bleuté */
-      --navy-deep: #1B2A4A;
-      /* Votre Bleu Marine Profond Structurel */
-      --navy-card: #131E33;
-      /* Fond des cartes Bento */
-      --navy-card-hover: #192640;
-      --butter-premium: #F3E5AB;
-      /* Votre Couleur Maîtresse d'Illumination */
-      --butter-glow: rgba(243, 229, 171, 0.12);
-      --butter-muted: #D1C493;
-      /* Beurre adouci pour les états secondaires */
-      --text-pure: #FFFFFF;
-      --text-muted: #8FA0BC;
-      /* Gris bleuté technique pour la lisibilité */
-      --border-line: rgba(243, 229, 171, 0.05);
-      /* Bordures subtiles teintées beurre */
-      --border-line-hover: rgba(243, 229, 171, 0.3);
-      --shadow-glow: 0 0 35px rgba(243, 229, 171, 0.08);
-      --radius-premium: 20px;
-      --radius-sm: 10px;
-    }
-
-    /* ── REINITIALISATION & TYPOGRAPHIE ──────────────────────────────────────── */
-    body {
-      background-color: var(--bg-main);
-      color: var(--text-pure);
-      font-family: 'Plus Jakarta Sans', sans-serif !important;
-      margin: 0;
-      padding: 0;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── HERO ARCHITECTURE (BUTTER AMBIENT GLOW) ────────────────────────────── */
-    .ot-hero {
-      position: relative;
-      background: radial-gradient(120% 150% at 50% 0%, #151E30 0%, var(--bg-main) 100%);
-      border-bottom: 1px solid var(--border-line);
-      padding: 9rem 2rem 5rem 2rem;
-      overflow: hidden;
-    }
-
-    /* Halo lumineux Beurre Premium en arrière-plan */
-    .ot-hero::before {
-      content: '';
-      position: absolute;
-      top: -40%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 900px;
-      height: 450px;
-      background: radial-gradient(50% 50% at 50% 50%, var(--butter-glow) 0%, transparent 100%);
-      pointer-events: none;
-    }
-
-    .ot-hero-inner {
-      max-width: 1300px;
-      margin: 0 auto;
-      position: relative;
-      z-index: 2;
-    }
-
-    /* Breadcrumb */
-    .ot-breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 2.5rem;
-    }
-
-    .ot-breadcrumb a {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    .ot-breadcrumb a:hover {
-      color: var(--butter-premium);
-    }
-
-    .ot-bc-sep {
-      opacity: 0.3;
-    }
-
-    /* Layout Hero Body */
-    .ot-hero-body {
-      display: flex;
-      align-items: flex-start;
-      gap: 40px;
-    }
-
-    /* Logo avec structure Navy & liseré Or Beurre */
-    .ot-logo {
-      width: 110px;
-      height: 110px;
-      background: var(--navy-deep);
-      border: 1px solid rgba(243, 229, 171, 0.25);
-      border-radius: var(--radius-premium);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: var(--shadow-glow);
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-
-    .ot-logo img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .ot-logo span {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: var(--butter-premium);
-      letter-spacing: -1px;
-    }
-
-    /* Badges */
-    .ot-hero-meta {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 1rem;
-    }
-
-    .ot-cat-pill {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      color: var(--text-muted);
-      padding: 6px 16px;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: 99px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .ot-version-pill {
-      background: var(--butter-glow);
-      border: 1px solid rgba(243, 229, 171, 0.2);
-      color: var(--butter-premium);
-      padding: 6px 14px;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: 99px;
-    }
-
-    /* Titre */
-    .ot-title {
-      font-size: 3.4rem;
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.03em;
-      margin: 0 0 1rem 0;
-      background: linear-gradient(180deg, #FFFFFF 0%, #000000 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .ot-subtitle {
-      font-size: 1.15rem;
-      color: var(--text-muted);
-      max-width: 850px;
-      line-height: 1.6;
-      margin-bottom: 2.5rem;
-    }
-
-    /* Actions & Notes */
-    .ot-hero-actions {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    .ot-score-big {
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-line);
-      padding: 10px 20px;
-      border-radius: var(--radius-sm);
-      gap: 6px;
-    }
-
-    .ot-star-big {
-      color: var(--butter-premium);
-      font-size: 1.2rem;
-    }
-
-    .ot-score-num {
-      font-size: 1.4rem;
-      font-weight: 800;
-    }
-
-    .ot-score-label {
-      color: var(--text-muted);
-      font-weight: 600;
-      opacity: 0.5;
-    }
-
-    .ot-score-count {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-left: 6px;
-      border-left: 1px solid rgba(255, 255, 255, 0.1);
-      padding-left: 12px;
-    }
-
-    /* Bouton Contrasté Signature Beurre */
-    .ot-btn-primary {
-      background-color: var(--butter-premium) !important;
-      color: var(--navy-deep) !important;
-      /* Texte sombre pour un contraste maximal réglementaire */
-      font-weight: 800;
-      padding: 14px 28px;
-      border-radius: var(--radius-sm);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      box-shadow: 0 10px 25px rgba(243, 229, 171, 0.15);
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .ot-btn-primary:hover {
-      transform: translateY(-2px);
-      background-color: #FFF !important;
-      box-shadow: 0 15px 30px rgba(243, 229, 171, 0.25);
-    }
-
-    .ot-btn-primary svg {
-      width: 16px;
-      height: 16px;
-      stroke: currentColor;
-      stroke-width: 2.5;
-      fill: none;
-    }
-
-    .ot-btn-fav {
-      background: var(--navy-deep) !important;
-      border: 1px solid var(--border-line) !important;
-      color: #FFFFFF !important;
-      font-weight: 700;
-      padding: 14px 24px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.2s ease;
-    }
-
-    .ot-btn-fav:hover {
-      background: var(--navy-card-hover) !important;
-      border-color: rgba(243, 229, 171, 0.2) !important;
-    }
-
-    .ot-btn-fav svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .ot-btn-ghost {
-      color: var(--text-muted) !important;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 14px;
-      padding: 14px 20px;
-      transition: color 0.2s;
-    }
-
-    .ot-btn-ghost:hover {
-      color: var(--butter-premium) !important;
-    }
-
-    /* ── STRUCTURE 2 COLONNES ASYMÉTRIQUES ───────────────────────────────────── */
-    .ot-page {
-      max-width: 1340px;
-      margin: 0 auto;
-      padding: 4rem 2rem;
-    }
-
-    .ot-layout {
-      display: grid;
-      grid-template-columns: 1.3fr 0.7fr;
-      gap: 40px;
-      align-items: start;
-    }
-
-    /* Modules Bento Navy */
-    .ot-section {
-      background: var(--navy-card);
-      border: 1px solid var(--border-line);
-      border-radius: var(--radius-premium);
-      padding: 32px;
-      margin-bottom: 32px;
-    }
-
-    .ot-section-title {
-      font-size: 1.3rem;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      margin: 0 0 24px 0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .ot-section-icon {
-      color: var(--butter-premium);
-    }
-
-    /* ── BLOCK PERFORMANCES GRID ────────────────────────────────────────────── */
-    .ot-perf-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-    }
-
-    .ot-perf-card {
-      background: rgba(11, 17, 30, 0.4);
-      border: 1px solid var(--border-line);
-      padding: 20px;
-      border-radius: var(--radius-sm);
-      transition: border-color 0.3s;
-    }
-
-    .ot-perf-card:hover {
-      border-color: rgba(243, 229, 171, 0.2);
-    }
-
-    .ot-perf-top {
-      display: flex;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-
-    .ot-perf-icon {
-      color: var(--butter-premium);
-      margin-right: 8px;
-    }
-
-    .ot-perf-label {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: #000000;
-      flex-grow: 1;
-    }
-
-    .ot-perf-val {
-      font-size: 15px;
-      font-weight: 800;
-      color: var(--text-pure);
-    }
-
-    /* Barre de charge Beurre Lumineux */
-    .ot-bar-track {
-      background: rgba(255, 255, 255, 0.05);
-      height: 4px;
-      border-radius: 99px;
-      overflow: hidden;
-    }
-
-    .ot-bar-fill {
-      background: var(--butter-premium);
-      box-shadow: 0 0 10px rgba(243, 229, 171, 0.4);
-      width: var(--pct);
-      height: 100%;
-      border-radius: 99px;
-    }
-
-    /* ── BENTO AVANTAGES / INCONVÉNIENTS ─────────────────────────────────────── */
-    .ot-pros-cons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-    }
-
-    @media (max-width: 768px) {
-      .ot-pros-cons {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .ot-pros,
-    .ot-cons {
-      background: rgba(0, 0, 0, 0.12);
-      border: 1px solid var(--border-line);
-      border-radius: var(--radius-sm);
-      padding: 24px;
-    }
-
-    .ot-pc-head {
-      font-weight: 800;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 18px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .ot-pc-head--pro {
-      color: #10B981;
-    }
-
-    .ot-pc-head--con {
-      color: #F43F5E;
-    }
-
-    .ot-pc-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .ot-pc-list li {
-      font-size: 14px;
-      font-weight: 600;
-      line-height: 1.5;
-      position: relative;
-      padding-left: 16px;
-      color: var(--text-muted);
-    }
-
-    .ot-pc-list li::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 8px;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--butter-premium);
-      opacity: 0.4;
-    }
-
-    /* ── GRILLE DES MODELES ASSOCIES ─────────────────────────────────────────── */
-    .ot-model-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-    }
-
-    .ot-model-card {
-      background: rgba(11, 17, 30, 0.3);
-      border: 1px solid var(--border-line);
-      border-radius: var(--radius-sm);
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      box-sizing: border-box;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .ot-model-card:hover {
-      background: var(--navy-card-hover);
-      border-color: var(--border-line-hover);
-      box-shadow: var(--shadow-glow);
-      transform: translateY(-2px);
-    }
-
-    .card-top {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-
-    .c-logo {
-      width: 44px;
-      height: 44px;
-      background: var(--navy-deep);
-      border: 1px solid var(--border-line);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 13px;
-      color: var(--butter-premium);
-      overflow: hidden;
-      flex-shrink: 0;
-    }
-
-    .c-logo img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .c-name {
-      font-weight: 800;
-      font-size: 15px;
-      color: var(--text-pure);
-    }
-
-    .c-cat {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .c-desc {
-      font-size: 13.5px;
-      line-height: 1.5;
-      color: #000000;
-      margin: 0 0 16px 0;
-      flex-grow: 1;
-    }
-
-    .ot-tag-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 16px;
-    }
-
-    .ot-tag {
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--text-pure);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 4px;
-      border: 1px solid var(--border-line);
-    }
-
-    .c-foot {
-      margin-top: auto;
-      text-align: right;
-    }
-
-    .btn-see {
-      color: var(--butter-premium);
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 13px;
-      transition: color 0.2s;
-    }
-
-    .btn-see:hover {
-      color: #FFFFFF;
-    }
-
-    /* ── REVIEWS CRITICS SYSTEM ─────────────────────────────────────────────── */
-    .ot-avg-badge {
-      background: var(--butter-glow);
-      border: 1px solid rgba(243, 229, 171, 0.2);
-      color: var(--butter-premium);
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 800;
-      margin-left: auto;
-    }
-
-    /* Zone Formulaire */
-    .ot-review-form-wrap {
-      background: rgba(0, 0, 0, 0.15);
-      border: 1px solid var(--border-line);
-      border-radius: var(--radius-sm);
-      padding: 24px;
-      margin-bottom: 32px;
-    }
-
-    .ot-review-form-title {
-      font-size: 1.1rem;
-      font-weight: 800;
-      margin: 0 0 20px 0;
-    }
-
-    /* Sélecteur d'étoiles Beurre */
-    .ot-star-picker {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 20px;
-      background: rgba(11, 17, 30, 0.4);
-      padding: 12px 18px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-line);
-    }
-
-    .ot-sp-label {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--text-muted);
-    }
-
-    .ot-stars-row {
-      display: flex;
-      gap: 4px;
-    }
-
-    .ot-sp-star {
-      cursor: pointer;
-    }
-
-    .ot-sp-star input {
-      display: none;
-    }
-
-    .ot-sp-star svg {
-      width: 24px;
-      height: 24px;
-      fill: rgba(255, 255, 255, 0.06);
-      transition: transform 0.1s, fill 0.2s;
-    }
-
-    .ot-sp-star:hover svg {
-      transform: scale(1.1);
-      fill: var(--butter-premium);
-    }
-
-    .ot-sp-star.is-active svg,
-    .ot-sp-star input:checked~svg {
-      fill: var(--butter-premium);
-    }
-
-    .ot-sp-hint {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    /* Inputs Textarea */
-    .ot-form-group {
-      position: relative;
-      margin-bottom: 20px;
-    }
-
-    .ot-form-label {
-      display: block;
-      font-size: 13.5px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: var(--text-muted);
-    }
-
-    .ot-form-textarea {
-      width: 100%;
-      box-sizing: border-box;
-      background: rgba(11, 17, 30, 0.4);
-      border: 1px solid var(--border-line);
-      border-radius: 8px;
-      padding: 14px;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-pure);
-      resize: vertical;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    .ot-form-textarea:focus {
-      border-color: var(--butter-premium);
-    }
-
-    .ot-char-count {
-      font-size: 11px;
-      color: var(--text-muted);
-      position: absolute;
-      bottom: -18px;
-      right: 0;
-      font-weight: 600;
-    }
-
-    .ot-btn-submit {
-      background: var(--butter-premium);
-      color: var(--navy-deep);
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-weight: 800;
-      font-size: 14px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: background-color 0.2s;
-    }
-
-    .ot-btn-submit:hover {
-      background-color: #FFFFFF;
-    }
-
-    /* Flux d'avis */
-    .ot-reviews {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      margin-top: 24px;
-    }
-
-    .ot-review-card {
-      border-bottom: 1px solid var(--border-line);
-      padding-bottom: 20px;
-    }
-
-    .ot-review-card:last-child {
-      border: none;
-      padding-bottom: 0;
-    }
-
-    .ot-rev-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 12px;
-    }
-
-    .ot-rev-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--navy-deep);
-      color: var(--butter-premium);
-      border: 1px solid var(--border-line);
-      font-weight: 800;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    .ot-rev-meta {
-      flex-grow: 1;
-    }
-
-    .ot-rev-name {
-      font-weight: 800;
-      font-size: 14.5px;
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    .ot-rev-stars {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      font-size: 13px;
-    }
-
-    .ot-star-on {
-      color: var(--butter-premium);
-    }
-
-    .ot-star-off {
-      color: rgba(255, 255, 255, 0.06);
-    }
-
-    .ot-rev-comment {
-      font-size: 14px;
-      line-height: 1.5;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin: 0;
-      padding-left: 54px;
-    }
-
-    /* Modérateurs avis */
-    .ot-rev-actions {
-      display: flex;
-      gap: 4px;
-    }
-
-    .ot-rev-btn {
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-    }
-
-    .ot-rev-btn--edit {
-      color: var(--text-muted);
-    }
-
-    .ot-rev-btn--edit:hover {
-      background: rgba(255, 255, 255, 0.04);
-      color: #FFF;
-    }
-
-    .ot-rev-btn--delete {
-      color: #F43F5E;
-    }
-
-    .ot-rev-btn--delete:hover {
-      background: rgba(244, 63, 94, 0.1);
-    }
-
-    /* ── SIDEBAR CARDS (NAVY HOOD) ──────────────────────────────────────────── */
-    .ot-col-side {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-
-    .ot-side-card {
-      background: var(--navy-card);
-      border: 1px solid var(--border-line);
-      border-radius: var(--radius-premium);
-      padding: 24px;
-    }
-
-    .ot-side-title {
-      font-size: 13px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-pure);
-      margin: 0 0 20px 0;
-      border-bottom: 1px solid var(--border-line);
-      padding-bottom: 12px;
-    }
-
-    /* Listes d'infos clés */
-    .ot-info-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .ot-info-list li {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 14px;
-    }
-
-    .ot-info-label {
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .ot-info-val {
-      font-weight: 800;
-      color: var(--text-pure);
-    }
-
-    .ot-star-inline {
-      color: var(--butter-premium);
-    }
-
-    /* Caractéristiques Pills Group */
-    .ot-car-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .ot-car-pill {
-      background: rgba(0, 0, 0, 0.15);
-      border: 1px solid var(--border-line);
-      color: var(--text-pure);
-      padding: 8px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      border-radius: 6px;
-    }
-
-    /* Accès Liens Externes */
-    .ot-dispo-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .ot-dispo-list li {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(0, 0, 0, 0.15);
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid var(--border-line);
-    }
-
-    .ot-dispo-type {
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-
-    .ot-dispo-url {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--text-pure);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: color 0.2s;
-    }
-
-    .ot-dispo-url:hover {
-      color: var(--butter-premium);
-    }
-
-    .ot-dispo-url svg {
-      width: 13px;
-      height: 13px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 2.5;
-    }
-
-    /* =========================================================
-   FIX CONTRASTE TEXTE DANS BLOCS SOMBRES
-========================================================= */
-
-    /* Tous les titres dans les sections doivent être lisibles */
-    .ot-section-title,
-    .ot-side-title {
-      color: #ffffff !important;
-    }
-
-    /* Forcer les textes dans les cards sombres */
-    .ot-section,
-    .ot-side-card,
-    .ot-model-card,
-    .ot-perf-card,
-    .ot-review-card {
-      color: var(--text-pure);
-    }
-
-    /* Corrige les textes trop "muted" dans fonds déjà sombres */
-    .ot-section p,
-    .ot-side-card p,
-    .ot-model-card p,
-    .ot-rev-comment {
-      color: #cbd5e1 !important;
-      /* gris clair lisible */
-    }
-
-    /* Labels dans sidebar (trop faibles actuellement) */
-    .ot-info-label,
-    .ot-perf-label,
-    .ot-sp-label,
-    .ot-form-label {
-      color: #e5e7eb !important;
-    }
-
-    /* Valeurs importantes doivent ressortir */
-    .ot-info-val,
-    .ot-perf-val {
-      color: #ffffff !important;
-    }
-
-    /* Fix cas extrêmes (texte hérité invisible) */
-    .ot-section *,
-    .ot-side-card * {
-      text-shadow: none;
-    }
-
-    /* Améliore lisibilité hover/états */
-    .ot-model-card:hover .c-name {
-      color: #ffffff;
-    }
-
-    /* ── COMPATIBILITÉ MOBILE ────────────────────────────────────────────────── */
-    @media (max-width: 992px) {
-      .ot-layout {
-        grid-template-columns: 1fr;
-      }
-
-      .ot-hero-body {
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      .ot-title {
-        font-size: 2.5rem;
-      }
-
-      .ot-hero {
-        padding: 8rem 1.5rem 4rem 1.5rem;
-      }
-
-      .ot-page {
-        padding: 2rem 1.5rem;
-      }
-    }
+/* ═══════════════════════════════════════════════════════════════
+   RÉFÉRENTIEL IA — PREMIUM INTERFACE  Navy #1B2A4A + #192640
+   Palette : Navy profond, Ivoire chaud, accents or/ambre
+═══════════════════════════════════════════════════════════════ */
+:root{
+  --navy:       #1B2A4A;
+  --navy-deep:  #192640;
+  --navy-hover: #243658;
+  --navy-card:  #1E3050;
+  --butter:     #D4AA60;
+  --butter-l:   #F5EDD8;
+  --butter-b:   #E8C97A;
+  --ivory:      #FAFAF7;
+  --white:      #FFFFFF;
+  --surface:    #F2F4F8;
+  --muted:      #6B7A99;
+  --border:     #DDE2EE;
+  --border-d:   rgba(255,255,255,.08);
+  --text:       #1A2340;
+  --green:      #0F7A4E;
+  --red:        #C0392B;
+  --r20:20px; --r14:14px; --r8:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ivory);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased}
+
+
+/* ──── HERO BAND ───────────────────────────────── */
+.hero{background:var(--navy-deep);padding:52px 48px 0}
+.hero-inner{max-width:1300px;margin:0 auto}
+
+.bc{display:flex;align-items:center;gap:7px;margin-bottom:32px}
+.bc a{font-size:12px;font-weight:600;color:rgba(255,255,255,.45);text-decoration:none;transition:color .2s}
+.bc a:hover{color:rgba(255,255,255,.85)}
+.bc-sep{font-size:11px;color:rgba(255,255,255,.2)}
+.bc-cur{font-size:12px;font-weight:700;color:rgba(255,255,255,.75)}
+
+/* Hero 3-col grid */
+.hero-grid{display:grid;grid-template-columns:108px 1fr 210px;gap:36px;align-items:start;padding-bottom:44px}
+
+/* Logo */
+.h-logo{
+  width:108px;height:108px;
+  background:var(--navy-card);
+  border:1px solid rgba(212,170,96,.3);
+  border-radius:22px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:24px;color:var(--butter);
+  overflow:hidden;flex-shrink:0;
+}
+.h-logo img{width:100%;height:100%;object-fit:cover}
+
+/* Infos centre */
+.h-pills{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.pill{padding:4px 12px;font-size:11px;font-weight:700;border-radius:99px;letter-spacing:.04em}
+.pill-cat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+.pill-ver{background:rgba(212,170,96,.15);border:1px solid rgba(212,170,96,.3);color:var(--butter)}
+.pill-live{background:rgba(15,122,78,.2);border:1px solid rgba(15,122,78,.35);color:#4BD49A;display:flex;align-items:center;gap:5px}
+.pill-live::before{content:'';width:5px;height:5px;background:#4BD49A;border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+.h-title{font-size:48px;font-weight:800;letter-spacing:-.04em;line-height:1;color:#fff;margin-bottom:12px}
+.h-sub{font-size:14.5px;color:rgba(255,255,255,.55);max-width:640px;line-height:1.65;font-weight:500;margin-bottom:26px}
+
+.h-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.score-chip{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:9px 15px;border-radius:10px}
+.sc-star{color:var(--butter);font-size:17px}
+.sc-num{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.03em}
+.sc-denom{font-size:12px;color:rgba(255,255,255,.4);font-weight:600}
+.sc-sep{width:1px;height:24px;background:rgba(255,255,255,.1)}
+.sc-rev{font-size:11.5px;color:rgba(255,255,255,.45);font-weight:600;line-height:1.4}
+.sc-rev span{display:block;font-size:16px;font-weight:800;color:#fff}
+
+.btn-butter{background:var(--butter);color:var(--navy);font-weight:800;font-size:13.5px;padding:11px 22px;border-radius:var(--r8);text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s;border:none;cursor:pointer}
+.btn-butter:hover{background:#fff}
+.btn-outline{background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);font-weight:700;font-size:13.5px;padding:11px 18px;border-radius:var(--r8);display:inline-flex;align-items:center;gap:7px;text-decoration:none;transition:all .2s;cursor:pointer}
+.btn-outline:hover{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06);color:#fff}
+.btn-ghost-white{color:rgba(255,255,255,.45);font-weight:600;font-size:13px;padding:11px 12px;text-decoration:none;transition:color .2s;display:inline-flex;align-items:center;gap:5px}
+.btn-ghost-white:hover{color:rgba(255,255,255,.85)}
+
+/* Stats side hero */
+.h-stats{display:flex;flex-direction:column;gap:10px}
+.hst{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 16px}
+.hst-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(53, 71, 184, 0.35);margin-bottom:5px}
+.hst-val{font-size:20px;font-weight:800;color: #31306c;letter-spacing:-.02em}
+.hst-sub{font-size:11px;color:rgba(255,255,255,.35);font-weight:600;margin-top:2px}
+.hst-up{color: #4BD49A}
+
+/* ──── CONTENT BELT (white wave) ─────────────── */
+.belt{background:var(--ivory);padding:40px 48px 64px}
+.belt-inner{max-width:1300px;margin:0 auto}
+.main-grid{display:grid;grid-template-columns:1fr 300px;gap:28px;align-items:start}
+
+/* ──── SECTION CARDS ──────────────────────────── */
+.sc{background:var(--white);border:1px solid var(--border);border-radius:var(--r20);padding:28px;margin-bottom:22px}
+.sc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.sc-title{font-size:15.5px;font-weight:800;color:var(--navy);display:flex;align-items:center;gap:10px}
+.sc-icon{width:30px;height:30px;background:var(--navy);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sc-badge{font-size:11.5px;color:var(--muted);font-weight:600;background:var(--surface);padding:4px 10px;border-radius:5px}
+
+/* ──── PERFORMANCES ───────────────────────────── */
+.perf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px}
+.pc{background:var(--ivory);border:1px solid var(--border);border-radius:var(--r14);padding:18px;transition:all .2s}
+.pc:hover{border-color:var(--butter-b);background:var(--butter-l);transform:translateY(-1px)}
+.pc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pc-label{font-size:12px;font-weight:700;color:var(--muted)}
+.pc-val{font-size:21px;font-weight:800;color:var(--navy)}
+.pc-icon{font-size:15px;margin-right:6px}
+.bar{background:#E4E8F0;height:3px;border-radius:99px;overflow:hidden;margin-top:2px}
+.bar-f{background:linear-gradient(90deg,var(--butter),#E8A830);width:var(--pct);height:100%;border-radius:99px}
+
+/* ──── AVANTAGES / INCONVÉNIENTS ─────────────── */
+.pc-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pcb{border-radius:var(--r14);padding:20px;border:1px solid}
+.pcb-pro{background:#F0FBF6;border-color:#A3DCC0}
+.pcb-con{background:#FFF3F2;border-color:#F5C0BA}
+.pcb-head{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.pcb-head-pro{color:#0A6E45}
+.pcb-head-con{color:#A8291E}
+.pcb-items{display:flex;flex-direction:column;gap:9px}
+.pcb-item{display:flex;align-items:flex-start;gap:9px;font-size:13px;font-weight:500;color:#3D4F6E;line-height:1.5}
+.pcb-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:6px}
+.dot-pro{background:#0A6E45}.dot-con{background:#A8291E}
+
+/* ──── MODÈLES ────────────────────────────────── */
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.mc{background:var(--ivory);border:1px solid var(--border);border-radius:var(--r14);padding:20px;display:flex;flex-direction:column;transition:all .25s}
+.mc:hover{border-color:var(--butter-b);background:var(--butter-l);transform:translateY(-2px)}
+.mc-top{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.mc-logo{width:40px;height:40px;background:var(--navy);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--butter);flex-shrink:0;overflow:hidden}
+.mc-logo img{width:100%;height:100%;object-fit:cover}
+.mc-name{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:2px}
+.mc-prov{font-size:11.5px;color:var(--muted);font-weight:600}
+.mc-desc{font-size:12.5px;color:var(--muted);line-height:1.55;font-weight:500;flex-grow:1;margin-bottom:12px}
+.mc-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.mc-tag{background:rgba(27,42,74,.06);border:1px solid rgba(27,42,74,.1);color:var(--navy);font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:4px}
+.mc-link{color:var(--butter);font-size:12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;align-self:flex-end;transition:color .2s}
+.mc-link:hover{color:var(--navy)}
+
+/* ──── AVIS ───────────────────────────────────── */
+.rev-badge{background:var(--butter-l);border:1px solid var(--butter-b);color:#9A7020;padding:4px 12px;border-radius:7px;font-size:13px;font-weight:800}
+.rev-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--r14);padding:22px;margin-bottom:22px}
+.rev-form-title{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:16px}
+.sp{display:flex;align-items:center;gap:11px;background:var(--white);border:1px solid var(--border);padding:10px 14px;border-radius:var(--r8);margin-bottom:14px}
+.sp-label{font-size:12.5px;font-weight:700;color:var(--muted)}
+.sp-stars{display:flex;gap:2px}
+.sp-s{cursor:pointer;font-size:22px;color:#D5DAEA;transition:all .15s;user-select:none}
+.sp-s:hover,.sp-s.on{color:var(--butter)}
+.sp-hint{font-size:11.5px;color:var(--muted);font-weight:600;margin-left:auto}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em}
+.form-ta{width:100%;background:var(--white);border:1px solid var(--border);border-radius:var(--r8);padding:12px;font-family:inherit;font-size:13.5px;color:var(--text);resize:vertical;outline:none;transition:border-color .2s;min-height:80px}
+.form-ta:focus{border-color:var(--butter-b)}
+.char-c{display:block;font-size:11px;color:var(--muted);text-align:right;margin-top:4px;font-weight:600}
+.btn-submit{background:var(--navy);color:#fff;border:none;padding:10px 20px;border-radius:var(--r8);font-weight:800;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .2s;margin-top:12px}
+.btn-submit:hover{background:var(--navy-hover)}
+
+.rev-list{display:flex;flex-direction:column}
+.rev-card{padding:16px 0;border-bottom:1px solid var(--border)}
+.rev-card:last-child{border:none}
+.rev-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rev-av{width:36px;height:36px;border-radius:50%;background:var(--navy);font-weight:800;font-size:12.5px;color:var(--butter);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.rev-av img{width:100%;height:100%;object-fit:cover}
+.rev-name{font-size:13.5px;font-weight:800;color:var(--navy);display:block;margin-bottom:2px}
+.rev-stars{display:flex;align-items:center;gap:2px;font-size:12px}
+.son{color:var(--butter)}.soff{color:#D5DAEA}
+.rev-score{font-size:11px;color:var(--muted);margin-left:5px;font-weight:700}
+.rev-actions{display:flex;gap:3px;margin-left:auto}
+.rev-btn{background:transparent;border:none;cursor:pointer;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background .2s;font-size:12.5px}
+.rev-btn-e{color:var(--muted)}.rev-btn-e:hover{background:var(--surface);color:var(--navy)}
+.rev-btn-d{color:var(--red)}.rev-btn-d:hover{background:#FFF0EE}
+.rev-comment{font-size:13px;color:var(--muted);line-height:1.6;font-weight:500;padding-left:46px;font-style:italic}
+.empty-state{text-align:center;padding:40px;color:var(--muted)}
+
+/* ──── SIDEBAR ─────────────────────────────────── */
+.side{display:flex;flex-direction:column;gap:16px}
+
+/* Carte navy sombre pour la sidebar principale */
+.scard-dark{background:var(--navy-deep);border:1px solid rgba(255,255,255,.06);border-radius:var(--r20);overflow:hidden}
+.scard-dark-head{background:var(--navy);padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.scard-dark-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4)}
+.scard-dark-body{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.sdi{display:flex;align-items:center;justify-content:space-between}
+.sdk{font-size:13px;font-weight:600;color:rgba(255,255,255,.45)}
+.sdv{font-size:13px;font-weight:800;color:#fff}
+.sdv-gold{color:var(--butter)}
+
+/* Carte CTA navy */
+.scard-cta{background:var(--navy-card);border:1px solid rgba(212,170,96,.2);border-radius:var(--r20);padding:20px;text-align:center}
+.scard-cta p{font-size:12.5px;color:rgba(255,255,255,.5);font-weight:500;line-height:1.55;margin-bottom:14px}
+.scard-cta a{display:block;background:var(--butter);color:var(--navy);font-weight:800;font-size:13.5px;padding:11px;border-radius:8px;text-decoration:none;transition:all .2s}
+.scard-cta a:hover{background:#fff}
+
+/* Carte claire pour carac / dispos */
+.scard{background:var(--white);border:1px solid var(--border);border-radius:var(--r20);padding:22px}
+.stitle{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding-bottom:11px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.car-pills{display:flex;flex-wrap:wrap;gap:7px}
+.car-pill{background:var(--navy-deep);color:rgba(255,255,255,.8);padding:6px 12px;font-size:11.5px;font-weight:700;border-radius:6px;border:1px solid rgba(255,255,255,.05);cursor:default;transition:all .2s}
+.car-pill:hover{background:var(--navy-hover);color:#fff}
+
+.dispo-list{display:flex;flex-direction:column;gap:9px;list-style:none;padding:0}
+.dispo-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r8);padding:11px 13px;display:flex;align-items:center;justify-content:space-between;transition:all .2s}
+.dispo-item:hover{border-color:var(--butter-b);background:var(--butter-l)}
+.dispo-type{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.dispo-link{font-size:12.5px;font-weight:700;color:var(--navy);text-decoration:none;display:flex;align-items:center;gap:5px;transition:color .2s}
+.dispo-link:hover{color:var(--butter)}
+
+/* Edit form */
+.ot-edit-form{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.ot-edit-actions{display:flex;align-items:center;gap:10px;margin-top:10px}
+
+/* Alerts */
+.alert{padding:11px 15px;border-radius:var(--r8);font-size:13.5px;font-weight:600;margin-bottom:14px}
+.alert-err{background:#FFF0EE;border:1px solid #F5C0BA;color:#A8291E}
+.alert-ok{background:#F0FBF6;border:1px solid #A3DCC0;color:#0A6E45}
+
+/* ──── FOOTER ─────────────────────────────────── */
+.ft{background:var(--navy-deep);border-top:1px solid rgba(255,255,255,.06);padding:26px 48px;display:flex;align-items:center;justify-content:space-between}
+.ft-left{font-size:13px;color:rgba(255,255,255,.35);font-weight:600}
+.ft-left span{color:var(--butter);font-weight:800}
+.ft-links{display:flex;gap:22px}
+.ft-links a{font-size:12.5px;color:rgba(255,255,255,.35);text-decoration:none;font-weight:600;transition:color .2s}
+.ft-links a:hover{color:rgba(255,255,255,.8)}
+
+/* ──── RESPONSIVE ─────────────────────────────── */
+@media(max-width:1100px){
+  .main-grid{grid-template-columns:1fr}
+  .hero-grid{grid-template-columns:108px 1fr}
+  .h-stats{display:none}
+}
+@media(max-width:768px){
+  .nb,.hero,.belt,.ft{padding-left:20px;padding-right:20px}
+  .hero-grid{grid-template-columns:1fr}
+  .h-logo{width:80px;height:80px;font-size:18px}
+  .h-title{font-size:34px}
+  .pc-wrap,.mg,.perf-grid{grid-template-columns:1fr}
+  .h-actions{flex-wrap:wrap}
+}
   </style>
 </head>
 
-<!-- ══ MODAL COLLECTIONS ══════════════════════════════════════════════════ -->
 <?php if (isset($_SESSION['user_id'])): ?>
-  <div class="fav-overlay" id="favOverlay" style="display:none">
-    <div class="fav-modal" id="favModal">
-      <div class="fav-modal-head">
-        <span>💾 Sauvegarder dans…</span>
-        <button class="fav-close" id="favClose">✕</button>
-      </div>
-      <div class="fav-collections" id="favCollections"></div>
-      <div class="fav-new">
-        <input type="text" id="favNewInput" placeholder="Nouvelle collection…" maxlength="100">
-        <button id="favNewBtn">Créer</button>
-      </div>
-      <p class="fav-new-error" id="favNewError"></p>
+<div class="fav-overlay" id="favOverlay" style="display:none">
+  <div class="fav-modal" id="favModal">
+    <div class="fav-modal-head">
+      <span>💾 Sauvegarder dans…</span>
+      <button class="fav-close" id="favClose">✕</button>
     </div>
+    <div class="fav-collections" id="favCollections"></div>
+    <div class="fav-new">
+      <input type="text" id="favNewInput" placeholder="Nouvelle collection…" maxlength="100">
+      <button id="favNewBtn">Créer</button>
+    </div>
+    <p class="fav-new-error" id="favNewError"></p>
   </div>
+</div>
 <?php endif; ?>
 
 <body>
 
-  <?php include "../includes/header.php"; ?>
+<?php include "../includes/header.php"; ?>
 
-  <!-- ══ HERO DE L'OUTIL ═══════════════════════════════════════════════════════ -->
-  <div class="ot-hero">
-    <div class="ot-hero-inner">
 
-      <!-- Fil d'Ariane -->
-      <nav class="ot-breadcrumb">
-        <a href="dashboard.php">Accueil</a>
-        <span class="ot-bc-sep">›</span>
-        <a href="dashboard.php"><?= htmlspecialchars($outil['categorie'] ?? 'Outils') ?></a>
-        <span class="ot-bc-sep">›</span>
-        <span><?= htmlspecialchars($outil['nom']) ?></span>
-      </nav>
 
-      <div class="ot-hero-body">
-        <!-- Logo -->
-        <div class="ot-logo">
-          <?php if ($outil['logo_url']): ?>
-            <img src="<?= htmlspecialchars($outil['logo_url']) ?>" alt="<?= htmlspecialchars($outil['nom']) ?>">
-          <?php else: ?>
-            <span><?= strtoupper(substr($outil['nom'], 0, 2)) ?></span>
+<!-- ══ HERO NAVY ════════════════════════════════════════════════════════ -->
+<div class="hero">
+  <div class="hero-inner">
+
+    <nav class="bc">
+      <a href="dashboard.php">Accueil</a>
+      <span class="bc-sep">›</span>
+      <a href="dashboard.php"><?= htmlspecialchars($outil['categorie'] ?? 'Outils') ?></a>
+      <span class="bc-sep">›</span>
+      <span class="bc-cur"><?= htmlspecialchars($outil['nom']) ?></span>
+    </nav>
+
+    <div class="hero-grid">
+
+      <!-- Logo outil -->
+      <div class="h-logo">
+        <?php if ($outil['logo_url']): ?>
+          <img src="<?= htmlspecialchars($outil['logo_url']) ?>" alt="<?= htmlspecialchars($outil['nom']) ?>">
+        <?php else: ?>
+          <?= strtoupper(substr($outil['nom'], 0, 2)) ?>
+        <?php endif; ?>
+      </div>
+
+      <!-- Centre : titre + actions -->
+      <div>
+        <div class="h-pills">
+          <span class="pill pill-cat"><?= htmlspecialchars($outil['categorie'] ?? 'Non classé') ?></span>
+          <?php if ($outil['version']): ?>
+            <span class="pill pill-ver">v<?= number_format($outil['version'], 1) ?></span>
           <?php endif; ?>
+          <span class="pill pill-live">Actif</span>
         </div>
 
-        <!-- Infos principales -->
-        <div class="ot-hero-info">
-          <div class="ot-hero-meta">
-            <span class="ot-cat-pill"><?= htmlspecialchars($outil['categorie'] ?? 'Non classé') ?></span>
-            <?php if ($outil['version']): ?>
-              <span class="ot-version-pill">v<?= number_format($outil['version'], 1) ?></span>
-            <?php endif; ?>
+        <h1 class="h-title"><?= htmlspecialchars($outil['nom']) ?></h1>
+        <p class="h-sub"><?= htmlspecialchars($outil['description'] ?? '') ?></p>
 
+        <div class="h-actions">
+          <div class="score-chip">
+            <span class="sc-star">★</span>
+            <span class="sc-num"><?= number_format($outil['global_rating'], 1) ?></span>
+            <span class="sc-denom">/5</span>
+            <?php if (count($reviews)): ?>
+              <div class="sc-sep"></div>
+              <div class="sc-rev"><span><?= count($reviews) ?></span>avis</div>
+            <?php endif; ?>
           </div>
 
-          <h1 class="ot-title"><?= htmlspecialchars($outil['nom']) ?></h1>
-          <p class="ot-subtitle"><?= htmlspecialchars($outil['description'] ?? '') ?></p>
+          <?php if ($outil['url']): ?>
+            <a class="btn-butter" href="<?= htmlspecialchars($outil['url']) ?>" target="_blank" rel="noopener">
+              <i class="bi bi-box-arrow-up-right"></i> Visiter le site
+            </a>
+          <?php endif; ?>
 
-          <!-- Score + CTA + ajout favoris -->
-          <div class="ot-hero-actions">
-            <div class="ot-score-big">
-              <span class="ot-star-big">★</span>
-              <span class="ot-score-num"><?= number_format($outil['global_rating'], 1) ?></span>
-              <span class="ot-score-label">/5</span>
-              <?php if (count($reviews)): ?>
-                <span class="ot-score-count">(<?= count($reviews) ?> avis)</span>
-              <?php endif; ?>
-            </div>
+          <?php if (isset($_SESSION['user_id'])): ?>
+            <button class="btn-outline js-fav-btn" data-id="<?= $outil['ID_OUTILS_IA'] ?>">
+              <i class="bi bi-heart"></i> Sauvegarder
+            </button>
+          <?php endif; ?>
 
-            <?php if ($outil['url']): ?>
-              <a class="ot-btn-primary" href="<?= htmlspecialchars($outil['url']) ?>" target="_blank" rel="noopener">
-                Visiter le site
-                <svg viewBox="0 0 24 24">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
-                </svg>
-              </a>
-            <?php endif; ?>
-
-            <!-- ❤ Bouton favori -->
-            <?php if (isset($_SESSION['user_id'])): ?>
-              <button class="ot-btn-fav js-fav-btn" data-id="<?= $outil['ID_OUTILS_IA'] ?>"
-                title="Sauvegarder dans une collection">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path
-                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-                Sauvegarder
-              </button>
-            <?php endif; ?>
-
-            <a class="ot-btn-ghost" href="dashboard.php">← Retour</a>
-          </div>
+          <a class="btn-ghost-white" href="dashboard.php">
+            <i class="bi bi-arrow-left"></i> Retour
+          </a>
         </div>
+      </div>
+
+      <!-- Stats latérales -->
+      <div class="h-stats">
+        <div class="hst">
+          <div class="hst-label">Note globale</div>
+          <div class="hst-val" style="color:var(--butter)">★ <?= number_format($outil['global_rating'], 1) ?></div>
+          <div class="hst-sub">sur 5</div>
+        </div>
+        <?php if (count($reviews)): ?>
+        <div class="hst">
+          <div class="hst-label">Avis</div>
+          <div class="hst-val"><?= count($reviews) ?></div>
+          <div class="hst-sub">utilisateurs</div>
+        </div>
+        <?php endif; ?>
+        <?php if ($perf && $perf['nb_evals'] > 0): ?>
+        <div class="hst">
+          <div class="hst-label">Évaluations</div>
+          <div class="hst-val"><?= $perf['nb_evals'] ?></div>
+          <div class="hst-sub hst-up">↑ Performances</div>
+        </div>
+        <?php endif; ?>
       </div>
 
     </div>
   </div>
+</div>
 
-  <!-- ══ CONTENU PRINCIPAL ═════════════════════════════════════════════════════ -->
-  <div class="ot-page">
-    <div class="ot-layout">
+<!-- ══ CONTENU PRINCIPAL ════════════════════════════════════════════════ -->
+<div class="belt">
+  <div class="belt-inner">
+    <div class="main-grid">
 
-      <!-- ── Colonne gauche (principale) ──────────────────────────────────────── -->
-      <div class="ot-col-main">
+      <!-- ─── Colonne principale ───────────────────────────── -->
+      <div>
 
         <!-- PERFORMANCES -->
         <?php if ($perf && $perf['nb_evals'] > 0): ?>
-          <section class="ot-section">
-            <h2 class="ot-section-title">
-              <span class="ot-section-icon">📊</span> Performances
-            </h2>
-            <div class="ot-perf-grid">
-              <?php
-              $metrics = [
-                ['label' => 'Rapidité', 'val' => $perf['rapidite'], 'icon' => '⚡'],
-                ['label' => 'Qualité', 'val' => $perf['qualite'], 'icon' => '✨'],
-                ['label' => 'Crédibilité', 'val' => $perf['credibilite'], 'icon' => '🛡️'],
-                ['label' => 'Score global', 'val' => $perf['score_global'], 'icon' => '🏆'],
-              ];
-              if ($perf['qualite_image'] > 0)
-                $metrics[] = ['label' => 'Qualité image', 'val' => $perf['qualite_image'], 'icon' => '🎨'];
-              foreach ($metrics as $m):
-                if (!$m['val'])
-                  continue;
-                $pct = round(($m['val'] / 5) * 100);
-                ?>
-                <div class="ot-perf-card">
-                  <div class="ot-perf-top">
-                    <span class="ot-perf-icon"><?= $m['icon'] ?></span>
-                    <span class="ot-perf-label"><?= $m['label'] ?></span>
-                    <span class="ot-perf-val"><?= number_format($m['val'], 1) ?></span>
-                  </div>
-                  <div class="ot-bar-track">
-                    <div class="ot-bar-fill" style="--pct:<?= $pct ?>%"></div>
-                  </div>
+        <div class="sc">
+          <div class="sc-head">
+            <div class="sc-title"><div class="sc-icon">📊</div> Performances</div>
+            <span class="sc-badge"><?= $perf['nb_evals'] ?> évaluations</span>
+          </div>
+          <div class="perf-grid">
+            <?php
+            $metrics = [
+              ['label'=>'Rapidité',     'val'=>$perf['rapidite'],    'icon'=>'⚡'],
+              ['label'=>'Qualité',      'val'=>$perf['qualite'],     'icon'=>'✨'],
+              ['label'=>'Crédibilité',  'val'=>$perf['credibilite'], 'icon'=>'🛡️'],
+              ['label'=>'Score global', 'val'=>$perf['score_global'],'icon'=>'🏆'],
+            ];
+            if ($perf['qualite_image'] > 0)
+              $metrics[] = ['label'=>'Qualité image','val'=>$perf['qualite_image'],'icon'=>'🎨'];
+            foreach ($metrics as $m):
+              if (!$m['val']) continue;
+              $pct = round(($m['val']/5)*100);
+            ?>
+            <div class="pc">
+              <div class="pc-top">
+                <div style="display:flex;align-items:center">
+                  <span class="pc-icon"><?= $m['icon'] ?></span>
+                  <span class="pc-label"><?= $m['label'] ?></span>
                 </div>
-              <?php endforeach; ?>
+                <span class="pc-val"><?= number_format($m['val'],1) ?></span>
+              </div>
+              <div class="bar"><div class="bar-f" style="--pct:<?= $pct ?>%"></div></div>
             </div>
-          </section>
+            <?php endforeach; ?>
+          </div>
+        </div>
         <?php endif; ?>
 
         <!-- AVANTAGES / INCONVÉNIENTS -->
         <?php if ($avantages || $inconvenients): ?>
-          <section class="ot-section">
-            <h2 class="ot-section-title">
-              <span class="ot-section-icon">⚖️</span> Avantages & Inconvénients
-            </h2>
-            <div class="ot-pros-cons">
-              <?php if ($avantages): ?>
-                <div class="ot-pros">
-                  <div class="ot-pc-head ot-pc-head--pro">
-                    <span>✅</span> Avantages
-                  </div>
-                  <ul class="ot-pc-list">
-                    <?php foreach ($avantages as $a): ?>
-                      <li><?= htmlspecialchars($a['description']) ?></li>
-                    <?php endforeach; ?>
-                  </ul>
-                </div>
-              <?php endif; ?>
-              <?php if ($inconvenients): ?>
-                <div class="ot-cons">
-                  <div class="ot-pc-head ot-pc-head--con">
-                    <span>❌</span> Inconvénients
-                  </div>
-                  <ul class="ot-pc-list">
-                    <?php foreach ($inconvenients as $i): ?>
-                      <li><?= htmlspecialchars($i['description']) ?></li>
-                    <?php endforeach; ?>
-                  </ul>
-                </div>
-              <?php endif; ?>
+        <div class="sc">
+          <div class="sc-head">
+            <div class="sc-title"><div class="sc-icon">⚖️</div> Avantages & Inconvénients</div>
+          </div>
+          <div class="pc-wrap">
+            <?php if ($avantages): ?>
+            <div class="pcb pcb-pro">
+              <div class="pcb-head pcb-head-pro"><i class="bi bi-check-circle-fill"></i> Avantages</div>
+              <div class="pcb-items">
+                <?php foreach ($avantages as $a): ?>
+                <div class="pcb-item"><div class="pcb-dot dot-pro"></div><?= htmlspecialchars($a['description']) ?></div>
+                <?php endforeach; ?>
+              </div>
             </div>
-          </section>
+            <?php endif; ?>
+            <?php if ($inconvenients): ?>
+            <div class="pcb pcb-con">
+              <div class="pcb-head pcb-head-con"><i class="bi bi-x-circle-fill"></i> Inconvénients</div>
+              <div class="pcb-items">
+                <?php foreach ($inconvenients as $i): ?>
+                <div class="pcb-item"><div class="pcb-dot dot-con"></div><?= htmlspecialchars($i['description']) ?></div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
         <?php endif; ?>
 
-        <!-- MODÈLES IA UTILISÉS -->
+        <!-- MODÈLES IA -->
         <?php if ($modeles): ?>
-          <section class="ot-section">
-            <h2 class="ot-section-title">
-              <span class="ot-section-icon">🤖</span> Modèles utilisés
-            </h2>
-            <div class="grid ot-model-grid">
-              <?php foreach ($modeles as $mod):
-                $tags = array_filter(explode(',', $mod['tags'] ?? ''));
-                ?>
-                <div class="model-item">
-                  <div class="card ot-model-card">
-                    <div class="card-top">
-                      <div class="c-logo">
-                        <?php if ($mod['provider_logo']): ?>
-                          <img src="<?= htmlspecialchars($mod['provider_logo']) ?>" alt="">
-                        <?php else: ?>
-                          <span><?= strtoupper(substr($mod['name'], 0, 2)) ?></span>
-                        <?php endif; ?>
-                      </div>
-                      <div style="min-width:0">
-                        <div class="c-name"><?= htmlspecialchars($mod['name']) ?></div>
-                        <span class="c-cat"><?= htmlspecialchars($mod['provider_name'] ?? 'Inconnu') ?></span>
-                      </div>
-                    </div>
-                    <p class="c-desc"><?= htmlspecialchars($mod['description'] ?? 'Aucune description.') ?></p>
-                    <?php if ($tags): ?>
-                      <div class="ot-tag-row">
-                        <?php foreach ($tags as $t): ?>
-                          <span class="ot-tag"><?= htmlspecialchars(trim($t)) ?></span>
-                        <?php endforeach; ?>
-                      </div>
-                    <?php endif; ?>
-                    <div class="c-foot">
-                      <a class="btn-see" href="modele.php?id=<?= $mod['ID_MODEL'] ?>">Voir →</a>
-                    </div>
-                  </div>
+        <div class="sc">
+          <div class="sc-head">
+            <div class="sc-title"><div class="sc-icon">🤖</div> Modèles utilisés</div>
+            <span class="sc-badge"><?= count($modeles) ?> modèle<?= count($modeles)>1?'s':'' ?></span>
+          </div>
+          <div class="mg">
+            <?php foreach ($modeles as $mod):
+              $tags = array_filter(explode(',', $mod['tags'] ?? ''));
+            ?>
+            <div class="mc">
+              <div class="mc-top">
+                <div class="mc-logo">
+                  <?php if ($mod['provider_logo']): ?>
+                    <img src="<?= htmlspecialchars($mod['provider_logo']) ?>" alt="">
+                  <?php else: ?>
+                    <?= strtoupper(substr($mod['name'],0,2)) ?>
+                  <?php endif; ?>
                 </div>
-              <?php endforeach; ?>
+                <div>
+                  <div class="mc-name"><?= htmlspecialchars($mod['name']) ?></div>
+                  <div class="mc-prov"><?= htmlspecialchars($mod['provider_name'] ?? 'Inconnu') ?></div>
+                </div>
+              </div>
+              <p class="mc-desc"><?= htmlspecialchars($mod['description'] ?? 'Aucune description.') ?></p>
+              <?php if ($tags): ?>
+              <div class="mc-tags">
+                <?php foreach ($tags as $t): ?>
+                  <span class="mc-tag"><?= htmlspecialchars(trim($t)) ?></span>
+                <?php endforeach; ?>
+              </div>
+              <?php endif; ?>
+              <a class="mc-link" href="modele.php?id=<?= $mod['ID_MODEL'] ?>">Voir le modèle <i class="bi bi-arrow-right"></i></a>
             </div>
-          </section>
+            <?php endforeach; ?>
+          </div>
+        </div>
         <?php endif; ?>
 
         <!-- AVIS UTILISATEURS -->
-
-        <section class="ot-section" id="avis">
-          <h2 class="ot-section-title">
-            <span class="ot-section-icon">💬</span> Avis utilisateurs
+        <div class="sc" id="avis">
+          <div class="sc-head">
+            <div class="sc-title"><div class="sc-icon">💬</div> Avis utilisateurs</div>
             <?php if ($avg_review): ?>
-              <span class="ot-avg-badge">★ <?= $avg_review ?></span>
+              <span class="rev-badge">★ <?= $avg_review ?></span>
             <?php endif; ?>
-          </h2>
+          </div>
 
-          <!-- Formulaire ajout d'avis -->
+          <!-- Formulaire -->
           <?php if (isset($_SESSION['user_id'])): ?>
-            <div class="ot-review-form-wrap">
-              <h3 class="ot-review-form-title">Laisser un avis</h3>
-
-              <?php if ($review_error): ?>
-                <div class="ot-alert ot-alert--error"><?= htmlspecialchars($review_error) ?></div>
-              <?php endif; ?>
-
-              <form class="ot-review-form" method="POST" action="outil.php?id=<?= $id ?>#avis">
-                <input type="hidden" name="action" value="add_review">
-
-                <!-- Étoiles interactives -->
-                <div class="ot-star-picker" id="starPicker">
-                  <span class="ot-sp-label">Votre note</span>
-                  <div class="ot-stars-row">
-                    <?php for ($s = 1; $s <= 5; $s++): ?>
-                      <label class="ot-sp-star" for="star<?= $s ?>" data-val="<?= $s ?>">
-                        <input type="radio" name="rating" id="star<?= $s ?>" value="<?= $s ?>" required>
-                        <svg viewBox="0 0 24 24">
-                          <path
-                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                      </label>
-                    <?php endfor; ?>
-                  </div>
-                  <span class="ot-sp-hint" id="starHint">Cliquez pour noter</span>
+          <div class="rev-form">
+            <div class="rev-form-title">Laisser un avis</div>
+            <?php if ($review_error): ?>
+              <div class="alert alert-err"><?= htmlspecialchars($review_error) ?></div>
+            <?php endif; ?>
+            <form method="POST" action="outil.php?id=<?= $id ?>#avis">
+              <div class="sp">
+                <span class="sp-label">Votre note</span>
+                <div class="sp-stars" id="spStars">
+                  <?php for ($s=1;$s<=5;$s++): ?>
+                  <label class="sp-s" data-v="<?= $s ?>" for="star<?= $s ?>">
+                    <input type="radio" name="rating" id="star<?= $s ?>" value="<?= $s ?>" required style="display:none">★
+                  </label>
+                  <?php endfor; ?>
                 </div>
-
-                <!-- Commentaire -->
-                <div class="ot-form-group">
-                  <label class="ot-form-label" for="reviewComment">Commentaire <span
-                      class="ot-optional">(optionnel)</span></label>
-                  <textarea class="ot-form-textarea" id="reviewComment" name="comment" rows="4" maxlength="1000"
-                    placeholder="Partagez votre expérience avec cet outil…"><?= htmlspecialchars($_POST['comment'] ?? '') ?></textarea>
-                  <span class="ot-char-count"><span id="charCount">0</span>/1000</span>
-                </div>
-
-                <button type="submit" class="ot-btn-submit">
-                  <i class="bi bi-send-fill"></i>
-                  Publier mon avis
-                </button>
-              </form>
-            </div>
+                <span class="sp-hint" id="spHint">Cliquez pour noter</span>
+              </div>
+              <div style="position:relative">
+                <label class="form-label">Commentaire <span style="opacity:.5;text-transform:none;font-size:11px">(optionnel)</span></label>
+                <textarea class="form-ta" name="comment" id="reviewTa" rows="3" maxlength="1000" placeholder="Partagez votre expérience…"><?= htmlspecialchars($_POST['comment'] ?? '') ?></textarea>
+                <span class="char-c"><span id="charCnt">0</span>/1000</span>
+              </div>
+              <button type="submit" class="btn-submit"><i class="bi bi-send-fill"></i> Publier mon avis</button>
+            </form>
+          </div>
           <?php endif; ?>
 
           <!-- Liste des avis -->
           <?php if ($reviews): ?>
-            <div class="ot-reviews">
-              <?php foreach ($reviews as $rev):
-                $stars = round($rev['rating']);
-                $is_own = isset($_SESSION['user_id']) && $_SESSION['user_id'] == $rev['ID_USERS'];
-                ?>
-                <div class="ot-review-card" id="review-<?= $rev['ID_REVIEW'] ?>">
-                  <div class="ot-rev-header">
-                    <div class="ot-rev-avatar">
-                      <?php if ($rev['user_image']): ?>
-                        <img src="<?= htmlspecialchars($rev['user_image']) ?>" alt="">
-                      <?php else: ?>
-                        <?= strtoupper(substr($rev['user_nom'], 0, 1)) ?>
-                      <?php endif; ?>
-                    </div>
-                    <div class="ot-rev-meta">
-                      <span class="ot-rev-name"><?= htmlspecialchars($rev['user_nom']) ?></span>
-                      <div class="ot-rev-stars">
-                        <?php for ($s = 1; $s <= 5; $s++): ?>
-                          <span class="<?= $s <= $stars ? 'ot-star-on' : 'ot-star-off' ?>">★</span>
-                        <?php endfor; ?>
-                        <span class="ot-rev-score"><?= number_format($rev['rating'], 1) ?></span>
-                      </div>
-                    </div>
 
-                    <!-- Actions si c'est son propre avis -->
-                    <?php if ($is_own): ?>
-                      <div class="ot-rev-actions">
+          <div class="rev-list">
+            
+            <?php foreach ($reviews as $rev):
+            
+              $stars  = round($rev['rating']);
+              $is_own = isset($_SESSION['user_id']) && $_SESSION['user_id'] == $rev['ID_USERS'];
+            ?>
+            <div class="rev-card" id="review-<?= $rev['ID_REVIEW'] ?>">
+              <div class="rev-hdr">
+               <div class="rev-av">
 
-                        <button type="button" class="ot-rev-btn ot-rev-btn--edit js-edit-btn"
-                          data-id="<?= $rev['ID_REVIEW'] ?>" title="Modifier">
-                          <i class="bi bi-pencil-fill"></i>
-                        </button>
-                        <form method="POST" action="outil.php?id=<?= $id ?>" style="display:inline"
-                          onsubmit="return confirm('Supprimer cet avis ?')">
-                          <input type="hidden" name="delete_review" value="<?= $rev['ID_REVIEW'] ?>">
-                          <button type="submit" class="ot-rev-btn ot-rev-btn--delete" title="Supprimer">
-                            <i class="bi bi-trash-fill"></i>
-                          </button>
-                        </form>
-                      </div>
-                    <?php endif; ?>
+<?php
+$avatarWebPath = "/Projet_IA/php/uploads/avatars/" . $rev['user_image'];
+
+$avatarServerPath =
+$_SERVER['DOCUMENT_ROOT']
+. "/Projet_IA/php/uploads/avatars/"
+. $rev['user_image'];
+?>
+
+<?php if (
+    !empty($rev['user_image'])
+    && file_exists($avatarServerPath)
+): ?>
+
+<img
+    src="<?= htmlspecialchars($avatarWebPath) ?>"
+    alt="<?= htmlspecialchars($rev['user_nom']) ?>">
+
+<?php else: ?>
+
+<?= strtoupper(substr($rev['user_nom'],0,1)) ?>
+
+<?php endif; ?>
+
+</div>
+                <div style="flex-grow:1">
+                  <span class="rev-name"><?= htmlspecialchars($rev['user_nom']) ?></span>
+                  <div class="rev-stars">
+                    <?php for ($s=1;$s<=5;$s++): ?>
+                      <span class="<?= $s<=$stars?'son':'soff' ?>">★</span>
+                    <?php endfor; ?>
+                    <span class="rev-score"><?= number_format($rev['rating'],1) ?></span>
                   </div>
-
-                  <?php if ($rev['comment']): ?>
-                    <p class="ot-rev-comment" id="comment-text-<?= $rev['ID_REVIEW'] ?>">
-                      "<?= htmlspecialchars($rev['comment']) ?>"
-                    </p>
-                  <?php endif; ?>
-
-                  <!-- Formulaire d'édition (caché par défaut) -->
-                  <?php if ($is_own): ?>
-                    <div class="ot-edit-form" id="edit-form-<?= $rev['ID_REVIEW'] ?>" style="display:none">
-                      <form method="POST" action="outil.php?id=<?= $id ?>">
-                        <input type="hidden" name="edit_review" value="<?= $rev['ID_REVIEW'] ?>">
-
-                        <!-- Étoiles édition -->
-                        <div class="ot-star-picker" id="editStarPicker-<?= $rev['ID_REVIEW'] ?>">
-                          <span class="ot-sp-label">Modifier la note</span>
-                          <div class="ot-stars-row">
-                            <?php for ($s = 1; $s <= 5; $s++): ?>
-                              <label class="ot-sp-star" for="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>">
-                                <input type="radio" name="rating_edit" id="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>"
-                                  value="<?= $s ?>" <?= $s == round($rev['rating']) ? 'checked' : '' ?>>
-                                <svg viewBox="0 0 24 24">
-                                  <path
-                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                </svg>
-                              </label>
-                            <?php endfor; ?>
-                          </div>
-                        </div>
-
-                        <textarea class="ot-form-textarea" name="comment_edit" rows="3"
-                          placeholder="Modifier votre commentaire…"><?= htmlspecialchars($rev['comment'] ?? '') ?></textarea>
-
-                        <div class="ot-edit-actions">
-                          <button type="submit" class="ot-btn-submit">
-                            <i class="bi bi-check-lg"></i> Enregistrer
-                          </button>
-                          <button type="button" class="ot-btn-ghost js-cancel-btn" data-id="<?= $rev['ID_REVIEW'] ?>">
-                            Annuler
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  <?php endif; ?>
-
                 </div>
-              <?php endforeach; ?>
-            </div>
-          <?php else: ?>
-            <div class="ot-empty-state">
-              <span class="ot-empty-icon">💭</span>
-              <p>Aucun avis pour cet outil pour le moment.</p>
-            </div>
-          <?php endif; ?>
+                <?php if ($is_own): ?>
+                <div class="rev-actions">
+                  <button class="rev-btn rev-btn-e js-edit-btn" data-id="<?= $rev['ID_REVIEW'] ?>" title="Modifier"><i class="bi bi-pencil-fill"></i></button>
+                  <form method="POST" action="outil.php?id=<?= $id ?>" style="display:inline" onsubmit="return confirm('Supprimer cet avis ?')">
+                    <input type="hidden" name="delete_review" value="<?= $rev['ID_REVIEW'] ?>">
+                    <button type="submit" class="rev-btn rev-btn-d" title="Supprimer"><i class="bi bi-trash-fill"></i></button>
+                  </form>
+                </div>
+                <?php endif; ?>
+              </div>
 
-        </section>
+              <?php if ($rev['comment']): ?>
+                <p class="rev-comment" id="comment-text-<?= $rev['ID_REVIEW'] ?>"><?= htmlspecialchars($rev['comment']) ?></p>
+              <?php endif; ?>
+
+              <?php if ($is_own): ?>
+              <div class="ot-edit-form" id="edit-form-<?= $rev['ID_REVIEW'] ?>">
+                <form method="POST" action="outil.php?id=<?= $id ?>">
+                  <input type="hidden" name="edit_review" value="<?= $rev['ID_REVIEW'] ?>">
+                  <div class="sp" style="margin-bottom:12px">
+                    <span class="sp-label">Modifier</span>
+                    <div class="sp-stars">
+                      <?php for ($s=1;$s<=5;$s++): ?>
+                      <label class="sp-s <?= $s<=round($rev['rating'])?'on':'' ?>" for="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>">
+                        <input type="radio" name="rating_edit" id="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>" value="<?= $s ?>" <?= $s==round($rev['rating'])?'checked':'' ?> style="display:none">★
+                      </label>
+                      <?php endfor; ?>
+                    </div>
+                  </div>
+                  <textarea class="form-ta" name="comment_edit" rows="3" placeholder="Modifier votre commentaire…"><?= htmlspecialchars($rev['comment'] ?? '') ?></textarea>
+                  <div class="ot-edit-actions">
+                    <button type="submit" class="btn-submit"><i class="bi bi-check-lg"></i> Enregistrer</button>
+                    <button type="button" class="btn-ghost-white js-cancel-btn" data-id="<?= $rev['ID_REVIEW'] ?>" style="color:var(--muted);font-size:13px;font-weight:600;background:none;border:none;cursor:pointer">Annuler</button>
+                  </div>
+                </form>
+              </div>
+              <?php endif; ?>
+
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php else: ?>
+          <div class="empty-state">
+            <span style="font-size:36px;display:block;margin-bottom:10px;opacity:.3">💭</span>
+            <p style="font-size:14px;font-weight:600">Aucun avis pour le moment. Soyez le premier !</p>
+          </div>
+          <?php endif; ?>
+        </div>
+
       </div><!-- /col-main -->
 
-      <!-- ── Colonne droite (sidebar) ─────────────────────────────────────────── -->
-      <aside class="ot-col-side">
+      <!-- ─── Colonne sidebar ──────────────────────────────── -->
+      <aside class="side">
 
-        <!-- Carte infos rapides -->
-        <div class="ot-side-card">
-          <h3 class="ot-side-title">Informations</h3>
-          <ul class="ot-info-list">
-            <li>
-              <span class="ot-info-label">Catégorie</span>
-              <span class="ot-info-val"><?= htmlspecialchars($outil['categorie'] ?? '—') ?></span>
-            </li>
-            <li>
-              <span class="ot-info-label">Version</span>
-              <span class="ot-info-val">
-                <?= $outil['version'] ? 'v' . number_format($outil['version'], 1) : '—' ?>
-              </span>
-            </li>
-            <li>
-              <span class="ot-info-label">Note globale</span>
-              <span class="ot-info-val ot-star-inline">★ <?= number_format($outil['global_rating'], 1) ?></span>
-            </li>
+        <!-- Infos clés — carte navy -->
+        <div class="scard-dark">
+          <div class="scard-dark-head">
+            <div class="scard-dark-title">Informations</div>
+          </div>
+          <div class="scard-dark-body">
+            <div class="sdi">
+              <span class="sdk">Catégorie</span>
+              <span class="sdv"><?= htmlspecialchars($outil['categorie'] ?? '—') ?></span>
+            </div>
+            <div class="sdi">
+              <span class="sdk">Version</span>
+              <span class="sdv"><?= $outil['version'] ? 'v'.number_format($outil['version'],1) : '—' ?></span>
+            </div>
+            <div class="sdi">
+              <span class="sdk">Note globale</span>
+              <span class="sdv sdv-gold">★ <?= number_format($outil['global_rating'],1) ?></span>
+            </div>
             <?php if (count($reviews)): ?>
-              <li>
-                <span class="ot-info-label">Nb d'avis</span>
-                <span class="ot-info-val"><?= count($reviews) ?></span>
-              </li>
+            <div class="sdi">
+              <span class="sdk">Avis</span>
+              <span class="sdv"><?= count($reviews) ?></span>
+            </div>
             <?php endif; ?>
-          </ul>
+          </div>
         </div>
+
+        <!-- CTA -->
+        <?php if ($outil['url']): ?>
+        <div class="scard-cta">
+          <p>Accédez directement à la plateforme officielle.</p>
+          <a href="<?= htmlspecialchars($outil['url']) ?>" target="_blank" rel="noopener">
+            Visiter <?= htmlspecialchars($outil['nom']) ?> →
+          </a>
+        </div>
+        <?php endif; ?>
 
         <!-- Caractéristiques -->
         <?php if ($cars): ?>
-          <div class="ot-side-card">
-            <h3 class="ot-side-title">Caractéristiques</h3>
-            <div class="ot-car-list">
-              <?php foreach ($cars as $car): ?>
-                <span class="ot-car-pill" title="<?= htmlspecialchars($car['description'] ?? '') ?>">
-                  <?= htmlspecialchars($car['name']) ?>
-                </span>
-              <?php endforeach; ?>
-            </div>
+        <div class="scard">
+          <div class="stitle">Caractéristiques</div>
+          <div class="car-pills">
+            <?php foreach ($cars as $car): ?>
+              <span class="car-pill" title="<?= htmlspecialchars($car['description'] ?? '') ?>">
+                <?= htmlspecialchars($car['name']) ?>
+              </span>
+            <?php endforeach; ?>
           </div>
+        </div>
         <?php endif; ?>
 
         <!-- Disponibilités -->
         <?php if ($dispos): ?>
-          <div class="ot-side-card">
-            <h3 class="ot-side-title">Disponibilités</h3>
-            <ul class="ot-dispo-list">
-              <?php foreach ($dispos as $d): ?>
-                <li>
-                  <span class="ot-dispo-type"><?= htmlspecialchars($d['type_name'] ?? 'Lien') ?></span>
-                  <a href="<?= htmlspecialchars($d['url']) ?>" target="_blank" rel="noopener" class="ot-dispo-url">
-                    <?= htmlspecialchars(parse_url($d['url'], PHP_URL_HOST)) ?>
-                    <svg viewBox="0 0 24 24">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
-                    </svg>
-                  </a>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-          </div>
+        <div class="scard">
+          <div class="stitle">Disponibilités</div>
+          <ul class="dispo-list">
+            <?php foreach ($dispos as $d): ?>
+            <li class="dispo-item">
+              <span class="dispo-type"><?= htmlspecialchars($d['type_name'] ?? 'Lien') ?></span>
+              <a href="<?= htmlspecialchars($d['url']) ?>" target="_blank" rel="noopener" class="dispo-link">
+                <?= htmlspecialchars(parse_url($d['url'], PHP_URL_HOST)) ?>
+                <i class="bi bi-box-arrow-up-right" style="font-size:11px"></i>
+              </a>
+            </li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
         <?php endif; ?>
 
       </aside>
 
-    </div><!-- /layout -->
-  </div><!-- /page -->
+    </div>
+  </div>
+</div>
 
-  <?php include "../includes/footer.php"; ?>
-  <script src="../js/outils.js"></script>
+<?php include "../includes/footer.php"; ?>
+<script src="../js/outils.js"></script>
+<script>
+/* ── Star picker ── */
+const stars = document.querySelectorAll('#spStars .sp-s');
+const hints = ['Mauvais','Passable','Correct','Bon','Excellent'];
+let sel = 0;
+stars.forEach((s,i) => {
+  s.addEventListener('mouseenter', () => { stars.forEach((x,j) => x.classList.toggle('on', j<=i)); document.getElementById('spHint').textContent = hints[i]; });
+  s.addEventListener('click', () => { sel = i+1; document.getElementById('spHint').textContent = hints[i]+' — sélectionné'; });
+});
+document.getElementById('spStars')?.addEventListener('mouseleave', () => {
+  stars.forEach((x,j) => x.classList.toggle('on', j<sel));
+  document.getElementById('spHint').textContent = sel ? hints[sel-1] : 'Cliquez pour noter';
+});
 
+/* ── Char count ── */
+const ta = document.getElementById('reviewTa');
+if (ta) ta.addEventListener('input', () => { document.getElementById('charCnt').textContent = ta.value.length; });
+
+/* ── Edit toggle ── */
+document.querySelectorAll('.js-edit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const ef = document.getElementById('edit-form-' + btn.dataset.id);
+    if (ef) ef.style.display = ef.style.display === 'none' || !ef.style.display ? 'block' : 'none';
+  });
+});
+document.querySelectorAll('.js-cancel-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const ef = document.getElementById('edit-form-' + btn.dataset.id);
+    if (ef) ef.style.display = 'none';
+  });
+});
+</script>
 </body>
-
 </html>

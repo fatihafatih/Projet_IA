@@ -415,6 +415,176 @@ try {
   transform: translateY(-1px);
 }
 
+.btn-val,
+.btn-ref {
+  cursor: pointer;
+}
+
+/* ============================================================
+   MODALE (Refus)
+   ============================================================ */
+.adm-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(27, 42, 74, 0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.adm-modal-overlay.open {
+  display: flex;
+}
+
+.adm-modal {
+  background: var(--adm-surface);
+  border-radius: var(--adm-radius);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(27,42,74,0.25);
+  animation: admModalIn .2s ease;
+}
+
+@keyframes admModalIn {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.adm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--adm-border);
+}
+
+.adm-modal-head h3 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--adm-text);
+  margin: 0;
+}
+
+.adm-modal-close {
+  border: none;
+  background: var(--adm-bg);
+  color: var(--adm-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.adm-modal-close:hover {
+  background: #FEF2F2;
+  color: var(--adm-red);
+}
+
+.adm-modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.adm-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--adm-border);
+}
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+  color: var(--adm-muted);
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.btn-cancel:hover {
+  background: var(--adm-bg);
+  color: var(--adm-text);
+}
+
+.btn-adm-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  transition: .2s ease;
+  text-decoration: none;
+}
+
+.btn-adm-primary:hover {
+  background: var(--primary-dark);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--adm-text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  font-size: .875rem;
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  box-sizing: border-box;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(74,107,176,0.12);
+}
+
+.refusal-error {
+  margin-top: 8px;
+  color: var(--adm-red);
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.hidden {
+  display: none !important;
+}
+
 /* ============================================================
    BAR LIST (Outils par catégorie)
    ============================================================ */
@@ -698,8 +868,8 @@ try {
                                 <td style="font-size:.82rem"><?= $p['version'] ? 'v' . $p['version'] : '—' ?></td>
                                 <td>
                                     <div class="act-btns">
-                                        <a href="outils.php?action=valider&id=<?= $p['ID_OUTILS_IA'] ?>" class="btn-val" onclick="return confirm('Valider et notifier le créateur ?')">✓ Valider</a>
-                                        <a href="outils.php?action=refuser&id=<?= $p['ID_OUTILS_IA'] ?>" class="btn-ref" onclick="return confirm('Refuser et notifier le créateur ?')">✗ Refuser</a>
+                                        <a href="verifier_outil.php?id=<?= $p['ID_OUTILS_IA'] ?>" class="btn-val">✓ Valider</a>
+                                        <button type="button" class="btn-ref" onclick="openRefusalModal(<?= $p['ID_OUTILS_IA'] ?>)">✗ Refuser</button>
                                     </div>
                                 </td>
                             </tr>
@@ -779,5 +949,53 @@ try {
     </div>
 
 </div>
+    <!-- ══ Modal Refus ══════════════════════════════════════════════ -->
+    <div class="adm-modal-overlay" id="refuseModal" onclick="if(event.target===this)closeModal('refuseModal')">
+        <div class="adm-modal">
+            <div class="adm-modal-head">
+                <h3>Refuser l'outil</h3>
+                <button onclick="closeModal('refuseModal')" class="adm-modal-close">×</button>
+            </div>
+            <form method="POST" action="outils.php" id="refuseForm" class="adm-modal-body" onsubmit="return validateRefusalForm()">
+                <input type="hidden" name="action" value="refuser">
+                <input type="hidden" name="outil_id" id="refuse_tool_id" value="0">
+                <input type="hidden" name="filter" value="en_attente">
+                <div class="form-group">
+                    <label class="form-label">Motif du refus *</label>
+                    <textarea id="refusalCauseInput" name="refusal_cause" class="form-control" rows="4"
+                        placeholder="Expliquez pourquoi l'outil est refusé."></textarea>
+                    <div id="refusalError" class="refusal-error hidden">Veuillez remplir le motif du refus.</div>
+                </div>
+                <div class="adm-modal-foot">
+                    <button type="button" class="btn-cancel" onclick="closeModal('refuseModal')">Annuler</button>
+                    <button type="submit" class="btn-adm-primary">Envoyer le refus</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openModal(id) { document.getElementById(id).classList.add('open'); document.body.style.overflow = 'hidden'; }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); document.body.style.overflow = ''; }
+
+        function openRefusalModal(oid) {
+            document.getElementById('refuse_tool_id').value = oid;
+            document.getElementById('refusalCauseInput').value = '';
+            document.getElementById('refusalError').classList.add('hidden');
+            openModal('refuseModal');
+        }
+
+        function validateRefusalForm() {
+            var textarea = document.getElementById('refusalCauseInput');
+            var error = document.getElementById('refusalError');
+            if (!textarea.value.trim()) {
+                error.classList.remove('hidden');
+                error.textContent = 'Veuillez remplir le motif du refus.';
+                textarea.focus();
+                return false;
+            }
+            return confirm('Refuser cet outil et notifier le créateur ?');
+        }
+    </script>
 </body>
 </html>
