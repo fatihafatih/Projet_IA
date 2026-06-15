@@ -106,6 +106,10 @@ body {
   gap: 12px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
+ .sidebar-logo img {
+        width: 42px; height: 42px;
+        object-fit: contain;
+        transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
 
 .sidebar-logo-icon {
   width: 38px;
@@ -633,7 +637,7 @@ tr:hover td {
 
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="sidebar-logo-icon"></div>
+   <img src="../../public/logo1.png" alt="SearchIA">
     <div class="sidebar-logo-text">SearchIA</div>
   </div>
 
