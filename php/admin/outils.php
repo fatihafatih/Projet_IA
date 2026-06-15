@@ -867,8 +867,8 @@ $allModels = $pdo->query(
                       <a href="outils.php?action=refuser&id=<?= $o['ID_OUTILS_IA'] ?>&filter=<?= $filter ?>" class="btn-ref"
                         title="Désactiver" onclick="return confirm('Désactiver ?')">⊘</a>
                     <?php else: ?>
-                      <a href="outils.php?action=activer&id=<?= $o['ID_OUTILS_IA'] ?>&filter=<?= $filter ?>" class="btn-val"
-                        onclick="return confirm('Réactiver ?')">↺</a>
+                      <a href="verifier_outil.php?id=<?= $o['ID_OUTILS_IA'] ?>" class="btn-val"
+                        title="Vérifier avant réactivation">↺</a>
                     <?php endif; ?>
                     <button class="btn-edt" data-id="<?= $o['ID_OUTILS_IA'] ?>"
                       onclick="openEditById(this.dataset.id)">✎</button>
