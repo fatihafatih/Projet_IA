@@ -1,88 +1,272 @@
 <?php
+/**
+ * ============================================================
+ *  outil.php — Page détail d'un outil IA
+ *  Modération automatique des avis via Groq (llama3-8b-8192)
+ *  Style : version 2 (ria-hero premium navy & gold)
+ * ============================================================
+ */
 session_start();
 require_once '../includes/connexionbd.php';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 if (!$id) { header('Location: dashboard.php'); exit; }
 
-$review_error = '';
+$review_error   = '';
 $review_success = '';
 
+// ============================================================
+//  FONCTION : Modération IA via Groq
+// ============================================================
+function verifier_avis_via_ia(string $comment): array
+{
+    $comment = trim($comment);
+
+    if (mb_strlen($comment) < 3) {
+        return ['ok' => true, 'raison' => ''];
+    }
+
+    // ══ FILTRE LOCAL (filet de sécurité garanti) ══════════════
+    $gros_mots = [
+        'merde','putain','connard','connasse','salope','enculé','enculer',
+        'encule','batard','bâtard','fils de pute','fdp','ta gueule','niquer',
+        'nique','chier','foutre','bordel','pute','bite','couille','couilles',
+        'con','conne','imbécile','idiot','crétin','abruti','débile','ostie',
+        'tabarnak','câlice','crisse','maudit','mange merde','va te faire',
+        'wtf','fuck','shit','bastard','asshole','crap','damn','bitch',
+    ];
+    $comment_lower = mb_strtolower($comment);
+    foreach ($gros_mots as $mot) {
+        if (preg_match('/\b' . preg_quote($mot, '/') . '\b/ui', $comment_lower)) {
+            return ['ok' => false, 'raison' => 'Langage inapproprié détecté'];
+        }
+    }
+
+    // ══ MODÉRATION IA (Groq) ══════════════════════════════════
+
+    $payload = [
+        'model'       => 'llama3-8b-8192',
+        'temperature' => 0,
+        'max_tokens'  => 120,
+        'messages'    => [
+            [
+                'role'    => 'system',
+                'content' =>
+                    'Tu es un modérateur strict. '
+                    . 'Réponds UNIQUEMENT avec ce JSON exact, sans rien d\'autre : '
+                    . '{"approuve":true,"raison":""} ou {"approuve":false,"raison":"raison courte"}. '
+                    . 'Refuse : insultes, gros mots, haine, spam, hors-sujet. '
+                    . 'Approuve : avis positifs, négatifs, critiques constructives sur des outils IA.',
+            ],
+            [
+                'role'    => 'user',
+                'content' => 'Modère ce commentaire : ' . $comment,
+            ],
+        ],
+    ];
+
+    $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+        ],
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$response || $httpCode !== 200) {
+        error_log('[Modération IA] Groq indisponible. HTTP ' . $httpCode);
+        return ['ok' => true, 'raison' => ''];
+    }
+
+    $data  = json_decode($response, true);
+    $texte = trim($data['choices'][0]['message']['content'] ?? '');
+
+    // Nettoyage markdown éventuel
+    $texte = preg_replace('/```(?:json)?\s*/i', '', $texte);
+    $texte = str_replace('```', '', $texte);
+    $texte = trim($texte);
+
+    preg_match('/\{.*?\}/s', $texte, $matches);
+    $result = json_decode($matches[0] ?? '{}', true);
+
+    if (!is_array($result) || !isset($result['approuve'])) {
+        error_log('[Modération IA] Parsing échoué : ' . $texte);
+        return ['ok' => true, 'raison' => ''];
+    }
+
+    return [
+        'ok'     => (bool) $result['approuve'],
+        'raison' => trim($result['raison'] ?? ''),
+    ];
+}
+
+// ============================================================
+//  POST : Nouvel avis
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rating'])) {
-  if (isset($_SESSION['user_id'])) {
-    $rating = (int) $_POST['rating'];
-    $comment = trim($_POST['comment'] ?? '');
-    if ($rating < 1 || $rating > 5) {
-      $review_error = 'Veuillez sélectionner une note entre 1 et 5.';
-    } else {
-      $ins = $pdo->prepare("INSERT INTO reviews (ID_OUTILS_IA, ID_USERS, rating, comment) VALUES (?, ?, ?, ?)");
-      $ins->execute([$id, $_SESSION['user_id'], $rating, $comment ?: null]);
-      $pdo->prepare("UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?")->execute([$id, $id]);
-      header("Location: outil.php?id=$id#avis"); exit;
+    if (isset($_SESSION['user_id'])) {
+        $rating  = (int) $_POST['rating'];
+        $comment = trim($_POST['comment'] ?? '');
+
+        if ($rating < 1 || $rating > 5) {
+            $review_error = 'Veuillez sélectionner une note entre 1 et 5.';
+        } else {
+            $moderation = $comment
+                ? verifier_avis_via_ia($comment)
+                : ['ok' => true, 'raison' => ''];
+
+            if (!$moderation['ok']) {
+                $review_error = 'Commentaire refusé par notre modérateur IA'
+                    . ($moderation['raison'] ? ' : ' . htmlspecialchars($moderation['raison']) : '.')
+                    . ' Veuillez reformuler.';
+            } else {
+                $ins = $pdo->prepare(
+                    "INSERT INTO reviews (ID_OUTILS_IA, ID_USERS, rating, comment) VALUES (?, ?, ?, ?)"
+                );
+                $ins->execute([$id, $_SESSION['user_id'], $rating, $comment ?: null]);
+                $pdo->prepare(
+                    "UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?"
+                )->execute([$id, $id]);
+                header("Location: outil.php?id=$id#avis"); exit;
+            }
+        }
     }
-  }
 }
 
+// ============================================================
+//  POST : Supprimer un avis
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_review'])) {
-  if (isset($_SESSION['user_id'])) {
-    $review_id = (int) $_POST['delete_review'];
-    $pdo->prepare("DELETE FROM reviews WHERE ID_REVIEW = ? AND ID_USERS = ?")->execute([$review_id, $_SESSION['user_id']]);
-    $pdo->prepare("UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?")->execute([$id, $id]);
-    header("Location: outil.php?id=$id#avis"); exit;
-  }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_review'])) {
-  if (isset($_SESSION['user_id'])) {
-    $review_id = (int) $_POST['edit_review'];
-    $rating_edit = (int) $_POST['rating_edit'];
-    $comment_edit = trim($_POST['comment_edit'] ?? '');
-    if ($rating_edit >= 1 && $rating_edit <= 5) {
-      $pdo->prepare("UPDATE reviews SET rating = ?, comment = ? WHERE ID_REVIEW = ? AND ID_USERS = ?")->execute([$rating_edit, $comment_edit ?: null, $review_id, $_SESSION['user_id']]);
-      $pdo->prepare("UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?")->execute([$id, $id]);
-      header("Location: outil.php?id=$id#avis"); exit;
+    if (isset($_SESSION['user_id'])) {
+        $review_id = (int) $_POST['delete_review'];
+        $pdo->prepare(
+            "DELETE FROM reviews WHERE ID_REVIEW = ? AND ID_USERS = ?"
+        )->execute([$review_id, $_SESSION['user_id']]);
+        $pdo->prepare(
+            "UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?"
+        )->execute([$id, $id]);
+        header("Location: outil.php?id=$id#avis"); exit;
     }
-  }
 }
 
-$stmt = $pdo->prepare("SELECT o.*, c.name AS categorie FROM outils_ia o LEFT JOIN categorie c ON o.ID_CATEGORIE = c.ID_CATEGORIE WHERE o.ID_OUTILS_IA = ? AND o.status = 'actif'");
+// ============================================================
+//  POST : Modifier un avis
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_review'])) {
+    if (isset($_SESSION['user_id'])) {
+        $review_id    = (int) $_POST['edit_review'];
+        $rating_edit  = (int) $_POST['rating_edit'];
+        $comment_edit = trim($_POST['comment_edit'] ?? '');
+
+        if ($rating_edit >= 1 && $rating_edit <= 5) {
+            $moderation = $comment_edit
+                ? verifier_avis_via_ia($comment_edit)
+                : ['ok' => true, 'raison' => ''];
+
+            if (!$moderation['ok']) {
+                $review_error = 'Modification refusée par notre modérateur IA'
+                    . ($moderation['raison'] ? ' : ' . htmlspecialchars($moderation['raison']) : '.')
+                    . ' Veuillez reformuler.';
+            } else {
+                $pdo->prepare(
+                    "UPDATE reviews SET rating = ?, comment = ? WHERE ID_REVIEW = ? AND ID_USERS = ?"
+                )->execute([$rating_edit, $comment_edit ?: null, $review_id, $_SESSION['user_id']]);
+                $pdo->prepare(
+                    "UPDATE outils_ia SET global_rating = (SELECT AVG(rating) FROM reviews WHERE ID_OUTILS_IA = ?) WHERE ID_OUTILS_IA = ?"
+                )->execute([$id, $id]);
+                header("Location: outil.php?id=$id#avis"); exit;
+            }
+        }
+    }
+}
+
+// ============================================================
+//  REQUÊTES BDD
+// ============================================================
+$stmt = $pdo->prepare(
+    "SELECT o.*, c.name AS categorie FROM outils_ia o
+     LEFT JOIN categorie c ON o.ID_CATEGORIE = c.ID_CATEGORIE
+     WHERE o.ID_OUTILS_IA = ? AND o.status = 'actif'"
+);
 $stmt->execute([$id]);
 $outil = $stmt->fetch();
 if (!$outil) { header('Location: dashboard.php'); exit; }
 
-$stmt = $pdo->prepare("SELECT AVG(rapidite) AS rapidite, AVG(qualite) AS qualite, AVG(qualite_image) AS qualite_image, AVG(credibilite) AS credibilite, AVG(score_global) AS score_global, COUNT(*) AS nb_evals FROM performance WHERE ID_OUTILS_IA = ?");
+$stmt = $pdo->prepare(
+    "SELECT AVG(rapidite) AS rapidite, AVG(qualite) AS qualite,
+            AVG(qualite_image) AS qualite_image, AVG(credibilite) AS credibilite,
+            AVG(score_global) AS score_global, COUNT(*) AS nb_evals
+     FROM performance WHERE ID_OUTILS_IA = ?"
+);
 $stmt->execute([$id]);
 $perf = $stmt->fetch();
 
-$stmt = $pdo->prepare("SELECT * FROM avantages_inconvenients WHERE ID_OUTILS_IA = ? ORDER BY type");
+$stmt = $pdo->prepare(
+    "SELECT * FROM avantages_inconvenients WHERE ID_OUTILS_IA = ? ORDER BY type"
+);
 $stmt->execute([$id]);
-$ais = $stmt->fetchAll();
+$ais           = $stmt->fetchAll();
 $avantages     = array_filter($ais, fn($r) => $r['type'] === 'avantage');
 $inconvenients = array_filter($ais, fn($r) => $r['type'] === 'inconvenient');
 
-$stmt = $pdo->prepare("
-    SELECT r.*, u.nom AS user_nom, u.image AS user_image
-    FROM reviews r
-    JOIN users u ON r.ID_USERS = u.id
-    WHERE r.ID_OUTILS_IA = ?
-    ORDER BY r.ID_REVIEW DESC
-");
+$imagePath = !empty($_SESSION['image'])
+    ? "/Projet_IA/php/uploads/avatars/" . htmlspecialchars($_SESSION['image'])
+    : '';
+
+$stmt = $pdo->prepare(
+    "SELECT r.*, u.nom AS user_nom, u.image AS user_image
+     FROM reviews r JOIN users u ON r.ID_USERS = u.id
+     WHERE r.ID_OUTILS_IA = ? ORDER BY r.ID_REVIEW DESC"
+);
 $stmt->execute([$id]);
 $reviews = $stmt->fetchAll();
 
-$stmt = $pdo->prepare("SELECT m.*, p.name AS provider_name, p.logo_url AS provider_logo, cat.name AS categorie FROM tool_models tm JOIN models m ON tm.ID_MODEL = m.ID_MODEL LEFT JOIN providers p ON m.ID_PROVIDERS = p.ID_PROVIDERS LEFT JOIN categorie cat ON m.ID_CATEGORIE = cat.ID_CATEGORIE WHERE tm.ID_OUTILS_IA = ? AND m.status='actif'");
+$stmt = $pdo->prepare(
+    "SELECT m.*, p.name AS provider_name, p.logo_url AS provider_logo, cat.name AS categorie
+     FROM tool_models tm
+     JOIN models m ON tm.ID_MODEL = m.ID_MODEL
+     LEFT JOIN providers p ON m.ID_PROVIDERS = p.ID_PROVIDERS
+     LEFT JOIN categorie cat ON m.ID_CATEGORIE = cat.ID_CATEGORIE
+     WHERE tm.ID_OUTILS_IA = ? AND m.status='actif'"
+);
 $stmt->execute([$id]);
 $modeles = $stmt->fetchAll();
 
-$stmt = $pdo->prepare("SELECT car.name, car.description FROM model_caracteristiques mc JOIN caracteristiques car ON mc.ID_CAR = car.ID_CAR JOIN tool_models tm ON mc.ID_MODEL = tm.ID_MODEL WHERE tm.ID_OUTILS_IA = ? GROUP BY car.ID_CAR");
+$stmt = $pdo->prepare(
+    "SELECT car.name, car.description
+     FROM model_caracteristiques mc
+     JOIN caracteristiques car ON mc.ID_CAR = car.ID_CAR
+     JOIN tool_models tm ON mc.ID_MODEL = tm.ID_MODEL
+     WHERE tm.ID_OUTILS_IA = ? GROUP BY car.ID_CAR"
+);
 $stmt->execute([$id]);
 $cars = $stmt->fetchAll();
 
-$stmt = $pdo->prepare("SELECT d.url, ta.name AS type_name FROM tool_caracteristiques tc JOIN disponibilite d ON tc.ID_DIS = d.ID_DIS LEFT JOIN type_application ta ON d.ID_TA = ta.ID_TA JOIN models m ON tc.ID_MODEL = m.ID_MODEL JOIN tool_models tm ON m.ID_MODEL = tm.ID_MODEL WHERE tm.ID_OUTILS_IA = ? GROUP BY d.ID_DIS");
+$stmt = $pdo->prepare(
+    "SELECT d.url, ta.name AS type_name
+     FROM tool_caracteristiques tc
+     JOIN disponibilite d ON tc.ID_DIS = d.ID_DIS
+     LEFT JOIN type_application ta ON d.ID_TA = ta.ID_TA
+     JOIN models m ON tc.ID_MODEL = m.ID_MODEL
+     JOIN tool_models tm ON m.ID_MODEL = tm.ID_MODEL
+     WHERE tm.ID_OUTILS_IA = ? GROUP BY d.ID_DIS"
+);
 $stmt->execute([$id]);
 $dispos = $stmt->fetchAll();
 
-$avg_review = count($reviews) ? round(array_sum(array_column($reviews, 'rating')) / count($reviews), 1) : null;
+$avg_review = count($reviews)
+    ? round(array_sum(array_column($reviews, 'rating')) / count($reviews), 1)
+    : null;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -167,7 +351,6 @@ body {
   list-style: none !important;
   padding: 0 !important;
   flex-wrap: nowrap !important;
-  justify-content: flex-start !important;
 }
 .ria-bc a {
   font-size: 12px !important;
@@ -307,7 +490,7 @@ body {
   border-radius: 10px !important;
 }
 .ria-score-star { color: #D4AA60 !important; font-size: 16px !important; line-height: 1 !important; }
-.ria-score-num  { font-size: 21px !important; font-weight: 800 !important; color: #fff !important; letter-spacing: -.02em !important; line-height: 1 !important; }
+.ria-score-num  { font-size: 21px !important; font-weight: 800 !important; color: #fff !important; letter-spacing: -.02em !important; }
 .ria-score-den  { font-size: 11px !important; color: rgba(255,255,255,.35) !important; font-weight: 600 !important; }
 .ria-score-sep  { width: 1px !important; height: 22px !important; background: rgba(255,255,255,.12) !important; }
 .ria-score-rev  { font-size: 11px !important; color: rgba(255,255,255,.4) !important; font-weight: 600 !important; line-height: 1.4 !important; }
@@ -366,11 +549,10 @@ body {
   border: none !important;
   cursor: pointer !important;
   transition: color .18s !important;
-  line-height: 1 !important;
 }
 .ria-btn-ghost:hover { color: rgba(255,255,255,.8) !important; }
 
-/* Séparateur */
+/* Séparateur doré */
 .ria-divider {
   height: 1px !important;
   background: linear-gradient(90deg, rgba(212,170,96,.25), rgba(212,170,96,.07) 60%, transparent) !important;
@@ -446,7 +628,7 @@ body {
   background: var(--navy);
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; color: var(--butter);
+  font-size: 14px;
   flex-shrink: 0;
 }
 .sc-badge {
@@ -457,10 +639,8 @@ body {
 /* ── Performances ── */
 .perf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
 .pc {
-  background: var(--ivory);
-  border: 1px solid var(--border);
-  border-radius: var(--r14);
-  padding: 18px;
+  background: var(--ivory); border: 1px solid var(--border);
+  border-radius: var(--r14); padding: 18px;
   transition: border-color .2s, background .2s, transform .15s;
 }
 .pc:hover { border-color: var(--butter-b); background: var(--butter-l); transform: translateY(-2px); }
@@ -495,18 +675,15 @@ body {
 /* ── Modèles IA ── */
 .mg { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
 .mc {
-  background: var(--ivory);
-  border: 1px solid var(--border);
-  border-radius: var(--r14);
-  padding: 20px;
+  background: var(--ivory); border: 1px solid var(--border);
+  border-radius: var(--r14); padding: 20px;
   display: flex; flex-direction: column;
   transition: border-color .2s, background .2s, transform .2s;
 }
 .mc:hover { border-color: var(--butter-b); background: var(--butter-l); transform: translateY(-2px); }
 .mc-top { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
 .mc-logo {
-  width: 40px; height: 40px;
-  background: var(--navy); border-radius: 10px;
+  width: 40px; height: 40px; background: var(--navy); border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 12px; color: var(--butter);
   flex-shrink: 0; overflow: hidden;
@@ -517,10 +694,8 @@ body {
 .mc-desc { font-size: 12.5px; color: var(--muted); line-height: 1.55; font-weight: 500; flex-grow: 1; margin-bottom: 12px; }
 .mc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
 .mc-tag {
-  background: rgba(27,42,74,.06);
-  border: 1px solid rgba(27,42,74,.1);
-  color: var(--navy); font-size: 10.5px; font-weight: 700;
-  padding: 3px 8px; border-radius: 4px;
+  background: rgba(27,42,74,.06); border: 1px solid rgba(27,42,74,.1);
+  color: var(--navy); font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
 }
 .mc-link {
   color: var(--butter); font-size: 12px; font-weight: 700;
@@ -534,6 +709,12 @@ body {
   background: var(--butter-l); border: 1px solid var(--butter-b);
   color: #9A7020; padding: 4px 12px; border-radius: 7px;
   font-size: 13px; font-weight: 800;
+}
+.mod-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; color: #6B7A99;
+  background: #fff; border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 6px; margin-bottom: 14px;
 }
 .rev-form {
   background: var(--surface); border: 1px solid var(--border);
@@ -571,6 +752,7 @@ body {
   transition: background .2s; margin-top: 12px;
 }
 .btn-submit:hover { background: var(--navy-hover); }
+.btn-submit:disabled { opacity: .6; cursor: not-allowed; }
 
 .rev-list { display: flex; flex-direction: column; }
 .rev-card { padding: 18px 0; border-bottom: 1px solid var(--border); }
@@ -612,7 +794,8 @@ body {
 }
 .ot-edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 
-.alert { padding: 11px 15px; border-radius: var(--r8); font-size: 13.5px; font-weight: 600; margin-bottom: 14px; }
+.alert { padding: 11px 15px; border-radius: var(--r8); font-size: 13.5px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 9px; line-height: 1.5; }
+.alert i { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
 .alert-err { background: #FFF0EE; border: 1px solid #F5C0BA; color: #A8291E; }
 .alert-ok  { background: #F0FBF6; border: 1px solid #A3DCC0; color: #0A6E45; }
 
@@ -621,7 +804,6 @@ body {
 ───────────────────────────────────────────────────────────── */
 .side { display: flex; flex-direction: column; gap: 16px; }
 
-/* Carte navy sombre */
 .scard-dark {
   background: var(--navy-deep);
   border: 1px solid rgba(255,255,255,.06);
@@ -636,16 +818,12 @@ body {
   font-size: 10.5px; font-weight: 800; text-transform: uppercase;
   letter-spacing: .1em; color: rgba(255,255,255,.35);
 }
-.scard-dark-body {
-  padding: 18px 20px;
-  display: flex; flex-direction: column; gap: 13px;
-}
+.scard-dark-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 13px; }
 .sdi { display: flex; align-items: center; justify-content: space-between; }
 .sdk { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.4); }
 .sdv { font-size: 13px; font-weight: 800; color: #fff; }
 .sdv-gold { color: var(--butter); }
 
-/* CTA card */
 .scard-cta {
   background: var(--navy-card);
   border: 1px solid rgba(212,170,96,.18);
@@ -662,17 +840,11 @@ body {
 }
 .scard-cta a:hover { background: #fff; }
 
-/* Carte blanche */
-.scard {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--r20); padding: 22px;
-}
+.scard { background: var(--white); border: 1px solid var(--border); border-radius: var(--r20); padding: 22px; }
 .stitle {
   font-size: 10.5px; font-weight: 800; text-transform: uppercase;
   letter-spacing: .1em; color: var(--muted);
-  padding-bottom: 11px; border-bottom: 1px solid var(--border);
-  margin-bottom: 14px;
+  padding-bottom: 11px; border-bottom: 1px solid var(--border); margin-bottom: 14px;
 }
 .car-pills { display: flex; flex-wrap: wrap; gap: 7px; }
 .car-pill {
@@ -697,43 +869,20 @@ body {
 }
 .dispo-link {
   font-size: 12.5px; font-weight: 700; color: var(--navy);
-  text-decoration: none; display: flex; align-items: center; gap: 5px;
-  transition: color .2s;
+  text-decoration: none; display: flex; align-items: center; gap: 5px; transition: color .2s;
 }
 .dispo-link:hover { color: var(--butter); }
 
 /* ─────────────────────────────────────────────────────────────
-   FOOTER
-───────────────────────────────────────────────────────────── */
-.ft {
-  background: var(--navy-deep);
-  border-top: 1px solid rgba(255,255,255,.06);
-  padding: 26px 52px;
-  display: flex; align-items: center; justify-content: space-between;
-}
-.ft-left { font-size: 12.5px; color: rgba(255,255,255,.32); font-weight: 600; }
-.ft-left span { color: var(--butter); font-weight: 800; }
-.ft-links { display: flex; gap: 22px; }
-.ft-links a {
-  font-size: 12px; color: rgba(255,255,255,.3);
-  text-decoration: none; font-weight: 600; transition: color .2s;
-}
-.ft-links a:hover { color: rgba(255,255,255,.75); }
-
-/* ─────────────────────────────────────────────────────────────
-   RESPONSIVENESS
+   RESPONSIVE
 ───────────────────────────────────────────────────────────── */
 @media (max-width: 1150px) {
   .main-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
-  .hero, .belt, .ft { padding-left: 20px; padding-right: 20px; }
-  .belt  { padding-left: 20px; padding-right: 20px; }
-  .ft    { padding-left: 20px; padding-right: 20px; }
-  .h-title   { font-size: 30px; }
-  .pc-wrap   { grid-template-columns: 1fr; }
-  .ft        { flex-direction: column; gap: 14px; text-align: center; }
-  .ft-links  { flex-wrap: wrap; justify-content: center; }
+  .belt { padding-left: 20px; padding-right: 20px; }
+  .pc-wrap { grid-template-columns: 1fr; }
+  .perf-grid, .mg { grid-template-columns: 1fr; }
 }
   </style>
 </head>
@@ -756,7 +905,6 @@ body {
 <?php endif; ?>
 
 <body>
-
 <?php include "../includes/header.php"; ?>
 
 <!-- ══ HERO ═══════════════════════════════════════════════════════════ -->
@@ -826,7 +974,7 @@ body {
         </div>
       </div>
 
-      <!-- Stats sidebar (masqué < 1150px) -->
+      <!-- Stats sidebar hero (masqué < 1150px) -->
       <div class="ria-stats" aria-label="Statistiques">
         <div class="ria-stat">
           <span class="ria-stat-label">Note globale</span>
@@ -861,32 +1009,28 @@ body {
   <div class="belt-inner">
     <div class="main-grid">
 
-      <!-- ─── Colonne principale ──────────────────────────────────── -->
       <main>
 
         <!-- PERFORMANCES -->
         <?php if ($perf && $perf['nb_evals'] > 0): ?>
         <div class="sc">
           <div class="sc-head">
-            <div class="sc-title">
-              <div class="sc-icon" aria-hidden="true">📊</div>
-              Performances
-            </div>
+            <div class="sc-title"><div class="sc-icon">📊</div> Performances</div>
             <span class="sc-badge"><?= $perf['nb_evals'] ?> évaluations</span>
           </div>
           <div class="perf-grid">
             <?php
             $metrics = [
-              ['label' => 'Rapidité',     'val' => $perf['rapidite'],     'icon' => '⚡'],
-              ['label' => 'Qualité',      'val' => $perf['qualite'],      'icon' => '✨'],
-              ['label' => 'Crédibilité',  'val' => $perf['credibilite'],  'icon' => '🛡️'],
-              ['label' => 'Score global', 'val' => $perf['score_global'], 'icon' => '🏆'],
+              ['label'=>'Rapidité',    'val'=>$perf['rapidite'],    'icon'=>'⚡'],
+              ['label'=>'Qualité',     'val'=>$perf['qualite'],     'icon'=>'✨'],
+              ['label'=>'Crédibilité', 'val'=>$perf['credibilite'], 'icon'=>'🛡️'],
+              ['label'=>'Score global','val'=>$perf['score_global'],'icon'=>'🏆'],
             ];
             if ($perf['qualite_image'] > 0)
-              $metrics[] = ['label' => 'Qualité image', 'val' => $perf['qualite_image'], 'icon' => '🎨'];
+              $metrics[] = ['label'=>'Qualité image','val'=>$perf['qualite_image'],'icon'=>'🎨'];
             foreach ($metrics as $m):
               if (!$m['val']) continue;
-              $pct = round(($m['val'] / 5) * 100);
+              $pct = round(($m['val']/5)*100);
             ?>
             <div class="pc">
               <div class="pc-top">
@@ -894,7 +1038,7 @@ body {
                   <span class="pc-icon" aria-hidden="true"><?= $m['icon'] ?></span>
                   <span class="pc-label"><?= $m['label'] ?></span>
                 </div>
-                <span class="pc-val"><?= number_format($m['val'], 1) ?></span>
+                <span class="pc-val"><?= number_format($m['val'],1) ?></span>
               </div>
               <div class="bar" role="progressbar" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100">
                 <div class="bar-f" style="--pct:<?= $pct ?>%"></div>
@@ -909,38 +1053,25 @@ body {
         <?php if ($avantages || $inconvenients): ?>
         <div class="sc">
           <div class="sc-head">
-            <div class="sc-title">
-              <div class="sc-icon" aria-hidden="true">⚖️</div>
-              Avantages &amp; Inconvénients
-            </div>
+            <div class="sc-title"><div class="sc-icon">⚖️</div> Avantages &amp; Inconvénients</div>
           </div>
           <div class="pc-wrap">
             <?php if ($avantages): ?>
             <div class="pcb pcb-pro">
-              <div class="pcb-head pcb-head-pro">
-                <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Avantages
-              </div>
+              <div class="pcb-head pcb-head-pro"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Avantages</div>
               <div class="pcb-items">
                 <?php foreach ($avantages as $a): ?>
-                <div class="pcb-item">
-                  <div class="pcb-dot dot-pro" aria-hidden="true"></div>
-                  <?= htmlspecialchars($a['description']) ?>
-                </div>
+                <div class="pcb-item"><div class="pcb-dot dot-pro" aria-hidden="true"></div><?= htmlspecialchars($a['description']) ?></div>
                 <?php endforeach; ?>
               </div>
             </div>
             <?php endif; ?>
             <?php if ($inconvenients): ?>
             <div class="pcb pcb-con">
-              <div class="pcb-head pcb-head-con">
-                <i class="bi bi-x-circle-fill" aria-hidden="true"></i> Inconvénients
-              </div>
+              <div class="pcb-head pcb-head-con"><i class="bi bi-x-circle-fill" aria-hidden="true"></i> Inconvénients</div>
               <div class="pcb-items">
                 <?php foreach ($inconvenients as $inc): ?>
-                <div class="pcb-item">
-                  <div class="pcb-dot dot-con" aria-hidden="true"></div>
-                  <?= htmlspecialchars($inc['description']) ?>
-                </div>
+                <div class="pcb-item"><div class="pcb-dot dot-con" aria-hidden="true"></div><?= htmlspecialchars($inc['description']) ?></div>
                 <?php endforeach; ?>
               </div>
             </div>
@@ -953,11 +1084,8 @@ body {
         <?php if ($modeles): ?>
         <div class="sc">
           <div class="sc-head">
-            <div class="sc-title">
-              <div class="sc-icon" aria-hidden="true">🤖</div>
-              Modèles utilisés
-            </div>
-            <span class="sc-badge"><?= count($modeles) ?> modèle<?= count($modeles) > 1 ? 's' : '' ?></span>
+            <div class="sc-title"><div class="sc-icon">🤖</div> Modèles utilisés</div>
+            <span class="sc-badge"><?= count($modeles) ?> modèle<?= count($modeles)>1?'s':'' ?></span>
           </div>
           <div class="mg">
             <?php foreach ($modeles as $mod):
@@ -969,7 +1097,7 @@ body {
                   <?php if ($mod['provider_logo']): ?>
                     <img src="<?= htmlspecialchars($mod['provider_logo']) ?>" alt="<?= htmlspecialchars($mod['provider_name'] ?? '') ?>">
                   <?php else: ?>
-                    <?= strtoupper(substr($mod['name'], 0, 2)) ?>
+                    <?= strtoupper(substr($mod['name'],0,2)) ?>
                   <?php endif; ?>
                 </div>
                 <div>
@@ -985,9 +1113,7 @@ body {
                 <?php endforeach; ?>
               </div>
               <?php endif; ?>
-              <a class="mc-link" href="modele.php?id=<?= $mod['ID_MODEL'] ?>">
-                Voir le modèle <i class="bi bi-arrow-right" aria-hidden="true"></i>
-              </a>
+              <a class="mc-link" href="modele.php?id=<?= $mod['ID_MODEL'] ?>">Voir le modèle <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
             </div>
             <?php endforeach; ?>
           </div>
@@ -997,28 +1123,32 @@ body {
         <!-- AVIS UTILISATEURS -->
         <div class="sc" id="avis">
           <div class="sc-head">
-            <div class="sc-title">
-              <div class="sc-icon" aria-hidden="true">💬</div>
-              Avis utilisateurs
-            </div>
+            <div class="sc-title"><div class="sc-icon">💬</div> Avis utilisateurs</div>
             <?php if ($avg_review): ?>
               <span class="rev-badge">★ <?= $avg_review ?></span>
             <?php endif; ?>
           </div>
 
-          <!-- Formulaire ajout avis -->
           <?php if (isset($_SESSION['user_id'])): ?>
           <div class="rev-form">
             <div class="rev-form-title">Laisser un avis</div>
+
+            <!-- Badge modération IA -->
+            <div class="mod-badge">🤖 Modéré automatiquement par IA</div>
+
             <?php if ($review_error): ?>
-              <div class="alert alert-err" role="alert"><?= htmlspecialchars($review_error) ?></div>
+              <div class="alert alert-err" role="alert">
+                <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+                <?= $review_error ?>
+              </div>
             <?php endif; ?>
-            <form method="POST" action="outil.php?id=<?= $id ?>#avis">
+
+            <form method="POST" action="outil.php?id=<?= $id ?>#avis" id="reviewForm">
               <div class="sp">
                 <span class="sp-label">Votre note</span>
                 <div class="sp-stars" id="spStars" role="group" aria-label="Sélectionner une note">
-                  <?php for ($s = 1; $s <= 5; $s++): ?>
-                  <label class="sp-s" data-v="<?= $s ?>" for="star<?= $s ?>" aria-label="<?= $s ?> étoile<?= $s > 1 ? 's' : '' ?>">
+                  <?php for ($s=1;$s<=5;$s++): ?>
+                  <label class="sp-s" for="star<?= $s ?>" aria-label="<?= $s ?> étoile<?= $s>1?'s':'' ?>">
                     <input type="radio" name="rating" id="star<?= $s ?>" value="<?= $s ?>" required style="display:none">★
                   </label>
                   <?php endfor; ?>
@@ -1029,17 +1159,11 @@ body {
                 <label class="form-label" for="reviewTa">
                   Commentaire <span style="opacity:.5;text-transform:none;font-size:11px;font-weight:400">(optionnel)</span>
                 </label>
-                <textarea
-                  class="form-ta"
-                  name="comment"
-                  id="reviewTa"
-                  rows="3"
-                  maxlength="1000"
-                  placeholder="Partagez votre expérience avec cet outil…"
-                ><?= htmlspecialchars($_POST['comment'] ?? '') ?></textarea>
+                <textarea class="form-ta" name="comment" id="reviewTa" rows="3" maxlength="1000"
+                  placeholder="Partagez votre expérience avec cet outil…"><?= htmlspecialchars($_POST['comment'] ?? '') ?></textarea>
                 <span class="char-c"><span id="charCnt">0</span>/1000</span>
               </div>
-              <button type="submit" class="btn-submit">
+              <button type="submit" class="btn-submit" id="submitBtn">
                 <i class="bi bi-send-fill" aria-hidden="true"></i> Publier mon avis
               </button>
             </form>
@@ -1061,30 +1185,28 @@ body {
                   <?php if (!empty($rev['user_image']) && file_exists($avatarServerPath)): ?>
                     <img src="<?= htmlspecialchars($avatarWebPath) ?>" alt="<?= htmlspecialchars($rev['user_nom']) ?>">
                   <?php else: ?>
-                    <?= strtoupper(substr($rev['user_nom'], 0, 1)) ?>
+                    <?= strtoupper(substr($rev['user_nom'],0,1)) ?>
                   <?php endif; ?>
                 </div>
                 <div style="flex-grow:1">
                   <span class="rev-name"><?= htmlspecialchars($rev['user_nom']) ?></span>
                   <div class="rev-stars" aria-label="Note : <?= $stars ?> sur 5">
-                    <?php for ($s = 1; $s <= 5; $s++): ?>
-                      <span class="<?= $s <= $stars ? 'son' : 'soff' ?>" aria-hidden="true">★</span>
+                    <?php for ($s=1;$s<=5;$s++): ?>
+                      <span class="<?= $s<=$stars?'son':'soff' ?>" aria-hidden="true">★</span>
                     <?php endfor; ?>
-                    <span class="rev-score"><?= number_format($rev['rating'], 1) ?></span>
+                    <span class="rev-score"><?= number_format($rev['rating'],1) ?></span>
                   </div>
                 </div>
                 <?php if ($is_own): ?>
                 <div class="rev-actions">
-                  <button
-                    class="rev-btn rev-btn-e js-edit-btn"
-                    data-id="<?= $rev['ID_REVIEW'] ?>"
-                    type="button"
-                    title="Modifier cet avis"
-                    aria-label="Modifier cet avis"
-                  ><i class="bi bi-pencil-fill" aria-hidden="true"></i></button>
-                  <form method="POST" action="outil.php?id=<?= $id ?>" style="display:inline" onsubmit="return confirm('Supprimer cet avis définitivement ?')">
+                  <button class="rev-btn rev-btn-e js-edit-btn" data-id="<?= $rev['ID_REVIEW'] ?>"
+                    type="button" title="Modifier" aria-label="Modifier cet avis">
+                    <i class="bi bi-pencil-fill" aria-hidden="true"></i>
+                  </button>
+                  <form method="POST" action="outil.php?id=<?= $id ?>" style="display:inline"
+                        onsubmit="return confirm('Supprimer cet avis définitivement ?')">
                     <input type="hidden" name="delete_review" value="<?= $rev['ID_REVIEW'] ?>">
-                    <button type="submit" class="rev-btn rev-btn-d" title="Supprimer cet avis" aria-label="Supprimer cet avis">
+                    <button type="submit" class="rev-btn rev-btn-d" title="Supprimer" aria-label="Supprimer cet avis">
                       <i class="bi bi-trash-fill" aria-hidden="true"></i>
                     </button>
                   </form>
@@ -1093,12 +1215,9 @@ body {
               </div>
 
               <?php if ($rev['comment']): ?>
-                <p class="rev-comment" id="comment-text-<?= $rev['ID_REVIEW'] ?>">
-                  <?= htmlspecialchars($rev['comment']) ?>
-                </p>
+                <p class="rev-comment"><?= htmlspecialchars($rev['comment']) ?></p>
               <?php endif; ?>
 
-              <!-- Formulaire modification -->
               <?php if ($is_own): ?>
               <div class="ot-edit-form" id="edit-form-<?= $rev['ID_REVIEW'] ?>">
                 <form method="POST" action="outil.php?id=<?= $id ?>">
@@ -1106,41 +1225,29 @@ body {
                   <div class="sp" style="margin-bottom:12px">
                     <span class="sp-label">Modifier la note</span>
                     <div class="sp-stars" role="group" aria-label="Modifier la note">
-                      <?php for ($s = 1; $s <= 5; $s++): ?>
-                      <label class="sp-s <?= $s <= round($rev['rating']) ? 'on' : '' ?>" for="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>">
-                        <input
-                          type="radio"
-                          name="rating_edit"
-                          id="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>"
-                          value="<?= $s ?>"
-                          <?= $s == round($rev['rating']) ? 'checked' : '' ?>
-                          style="display:none"
-                        >★
+                      <?php for ($s=1;$s<=5;$s++): ?>
+                      <label class="sp-s <?= $s<=round($rev['rating'])?'on':'' ?>"
+                             for="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>">
+                        <input type="radio" name="rating_edit"
+                               id="edit-star-<?= $rev['ID_REVIEW'] ?>-<?= $s ?>"
+                               value="<?= $s ?>" <?= $s==round($rev['rating'])?'checked':'' ?>
+                               style="display:none">★
                       </label>
                       <?php endfor; ?>
                     </div>
                   </div>
-                  <textarea
-                    class="form-ta"
-                    name="comment_edit"
-                    rows="3"
-                    placeholder="Modifier votre commentaire…"
-                  ><?= htmlspecialchars($rev['comment'] ?? '') ?></textarea>
+                  <textarea class="form-ta" name="comment_edit" rows="3"
+                    placeholder="Modifier votre commentaire…"><?= htmlspecialchars($rev['comment'] ?? '') ?></textarea>
                   <div class="ot-edit-actions">
-                    <button type="submit" class="btn-submit">
-                      <i class="bi bi-check-lg" aria-hidden="true"></i> Enregistrer
+                    <button type="submit" class="btn-submit"><i class="bi bi-check-lg" aria-hidden="true"></i> Enregistrer</button>
+                    <button type="button" class="js-cancel-btn" data-id="<?= $rev['ID_REVIEW'] ?>"
+                      style="color:var(--muted);font-size:13px;font-weight:600;background:none;border:none;cursor:pointer">
+                      Annuler
                     </button>
-                    <button
-                      type="button"
-                      class="js-cancel-btn"
-                      data-id="<?= $rev['ID_REVIEW'] ?>"
-                      style="color:var(--muted);font-size:13px;font-weight:600;background:none;border:none;cursor:pointer"
-                    >Annuler</button>
                   </div>
                 </form>
               </div>
               <?php endif; ?>
-
             </div>
             <?php endforeach; ?>
           </div>
@@ -1153,45 +1260,27 @@ body {
           <?php endif; ?>
         </div>
 
-      </main><!-- /main -->
+      </main>
 
-      <!-- ─── Sidebar ─────────────────────────────────────────────── -->
+      <!-- SIDEBAR -->
       <aside class="side">
-
-        <!-- Infos clés -->
         <div class="scard-dark">
           <div class="scard-dark-head">
             <div class="scard-dark-title">Informations</div>
           </div>
           <div class="scard-dark-body">
-            <div class="sdi">
-              <span class="sdk">Catégorie</span>
-              <span class="sdv"><?= htmlspecialchars($outil['categorie'] ?? '—') ?></span>
-            </div>
-            <div class="sdi">
-              <span class="sdk">Version</span>
-              <span class="sdv"><?= $outil['version'] ? 'v' . number_format($outil['version'], 1) : '—' ?></span>
-            </div>
-            <div class="sdi">
-              <span class="sdk">Note globale</span>
-              <span class="sdv sdv-gold">★ <?= number_format($outil['global_rating'], 1) ?></span>
-            </div>
+            <div class="sdi"><span class="sdk">Catégorie</span><span class="sdv"><?= htmlspecialchars($outil['categorie'] ?? '—') ?></span></div>
+            <div class="sdi"><span class="sdk">Version</span><span class="sdv"><?= $outil['version'] ? 'v'.number_format($outil['version'],1) : '—' ?></span></div>
+            <div class="sdi"><span class="sdk">Note globale</span><span class="sdv sdv-gold">★ <?= number_format($outil['global_rating'],1) ?></span></div>
             <?php if (count($reviews)): ?>
-            <div class="sdi">
-              <span class="sdk">Avis utilisateurs</span>
-              <span class="sdv"><?= count($reviews) ?></span>
-            </div>
+            <div class="sdi"><span class="sdk">Avis utilisateurs</span><span class="sdv"><?= count($reviews) ?></span></div>
             <?php endif; ?>
             <?php if ($perf && $perf['nb_evals'] > 0): ?>
-            <div class="sdi">
-              <span class="sdk">Évaluations</span>
-              <span class="sdv"><?= $perf['nb_evals'] ?></span>
-            </div>
+            <div class="sdi"><span class="sdk">Évaluations</span><span class="sdv"><?= $perf['nb_evals'] ?></span></div>
             <?php endif; ?>
           </div>
         </div>
 
-        <!-- CTA -->
         <?php if ($outil['url']): ?>
         <div class="scard-cta">
           <p>Accédez directement à la plateforme officielle de <?= htmlspecialchars($outil['nom']) ?>.</p>
@@ -1201,7 +1290,6 @@ body {
         </div>
         <?php endif; ?>
 
-        <!-- Caractéristiques -->
         <?php if ($cars): ?>
         <div class="scard">
           <div class="stitle">Caractéristiques</div>
@@ -1215,7 +1303,6 @@ body {
         </div>
         <?php endif; ?>
 
-        <!-- Disponibilités -->
         <?php if ($dispos): ?>
         <div class="scard">
           <div class="stitle">Disponibilités</div>
@@ -1232,23 +1319,21 @@ body {
           </ul>
         </div>
         <?php endif; ?>
-
       </aside>
 
-    </div><!-- /main-grid -->
-  </div><!-- /belt-inner -->
-</div><!-- /belt -->
+    </div>
+  </div>
+</div>
 
 <?php include "../includes/footer.php"; ?>
-
 <script src="../js/outils.js"></script>
 <script>
 /* ── Star picker (nouveau formulaire) ── */
 (function () {
   const container = document.getElementById('spStars');
   if (!container) return;
-  const stars = container.querySelectorAll('.sp-s');
-  const hint  = document.getElementById('spHint');
+  const stars  = container.querySelectorAll('.sp-s');
+  const hint   = document.getElementById('spHint');
   const labels = ['Mauvais', 'Passable', 'Correct', 'Bon', 'Excellent'];
   let selected = 0;
 
@@ -1275,6 +1360,15 @@ body {
   const cnt = document.getElementById('charCnt');
   if (ta && cnt) ta.addEventListener('input', () => { cnt.textContent = ta.value.length; });
 })();
+
+/* ── Spinner pendant la vérification IA ── */
+document.getElementById('reviewForm')?.addEventListener('submit', function () {
+  const btn = document.getElementById('submitBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Vérification IA en cours…';
+  }
+});
 
 /* ── Toggle formulaire de modification ── */
 document.querySelectorAll('.js-edit-btn').forEach(btn => {
